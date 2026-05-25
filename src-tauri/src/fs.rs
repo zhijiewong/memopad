@@ -86,3 +86,60 @@ mod encoding_tests {
         assert_eq!(offset, 0);
     }
 }
+
+/// Detects the dominant line ending in a string.
+/// Tie-break order: CRLF > LF > CR. If none found, defaults to platform default (LF).
+pub fn detect_line_ending(text: &str) -> LineEnding {
+    let crlf = text.matches("\r\n").count();
+    let bytes = text.as_bytes();
+    let total_lf = bytes.iter().filter(|&&b| b == b'\n').count();
+    let total_cr = bytes.iter().filter(|&&b| b == b'\r').count();
+    let bare_lf = total_lf.saturating_sub(crlf);
+    let bare_cr = total_cr.saturating_sub(crlf);
+
+    if crlf > 0 && crlf >= bare_lf && crlf >= bare_cr {
+        LineEnding::Crlf
+    } else if bare_lf >= bare_cr {
+        // Includes "no endings found" — fall through to LF as the platform-neutral default.
+        LineEnding::Lf
+    } else {
+        LineEnding::Cr
+    }
+}
+
+#[cfg(test)]
+mod eol_tests {
+    use super::*;
+
+    #[test]
+    fn detects_crlf() {
+        assert_eq!(detect_line_ending("a\r\nb\r\nc"), LineEnding::Crlf);
+    }
+
+    #[test]
+    fn detects_lf() {
+        assert_eq!(detect_line_ending("a\nb\nc"), LineEnding::Lf);
+    }
+
+    #[test]
+    fn detects_cr() {
+        assert_eq!(detect_line_ending("a\rb\rc"), LineEnding::Cr);
+    }
+
+    #[test]
+    fn empty_defaults_to_lf() {
+        assert_eq!(detect_line_ending(""), LineEnding::Lf);
+    }
+
+    #[test]
+    fn no_endings_defaults_to_lf() {
+        assert_eq!(detect_line_ending("one line no endings"), LineEnding::Lf);
+    }
+
+    #[test]
+    fn mixed_picks_majority_crlf_over_lf() {
+        // CRLF (3) appears more often than a bare LF (1).
+        // Note: each CRLF also contains an LF; the function must not double-count.
+        assert_eq!(detect_line_ending("a\r\nb\r\nc\r\nd\ne"), LineEnding::Crlf);
+    }
+}
