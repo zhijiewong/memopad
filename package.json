@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "tauri build && mocha"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
