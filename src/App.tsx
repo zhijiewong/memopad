@@ -2,8 +2,24 @@ import { useEffect } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { Editor } from './components/Editor';
 import { useBuffer } from './stores/buffer';
-import { openFile } from './lib/tauri';
-import { pickFileToOpen } from './lib/dialog';
+import { openFile, saveFile } from './lib/tauri';
+import { pickFileToOpen, pickFileToSave } from './lib/dialog';
+
+async function doSave(saveAs: boolean) {
+  const s = useBuffer.getState();
+  let path = s.path;
+  if (!path || saveAs) {
+    const picked = await pickFileToSave(path);
+    if (!picked) return;
+    path = picked;
+  }
+  try {
+    await saveFile(path, s.content, s.encoding, s.eol);
+    useBuffer.getState().markSaved(path);
+  } catch (err) {
+    console.error('save failed:', err);
+  }
+}
 
 export default function App() {
   useEffect(() => {
@@ -22,6 +38,19 @@ export default function App() {
         } catch (err) {
           console.error('open failed:', err);
         }
+        return;
+      }
+
+      if (key === 's' && !e.shiftKey) {
+        e.preventDefault();
+        await doSave(false);
+        return;
+      }
+
+      if (key === 's' && e.shiftKey) {
+        e.preventDefault();
+        await doSave(true);
+        return;
       }
     };
 
