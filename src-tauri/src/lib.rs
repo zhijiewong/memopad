@@ -28,11 +28,14 @@ fn window_is_maximized(window: tauri::Window) -> Result<bool, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             window_minimize,
             window_toggle_maximize,
             window_close,
             window_is_maximized,
+            fs::open_file,
+            fs::save_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
