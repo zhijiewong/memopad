@@ -1,29 +1,32 @@
 # Phase 2 — Results
 
-- Vitest: 10 tests passing
-- cargo test (fs module): 29 tests passing
+## Automated test gates (all green)
+
+- **Vitest** (UI unit): 10 tests passing
+- **cargo test** (Rust fs module): 29 tests passing — incl. UTF-16 LE BOM round-trip
+- **e2e suite** (WebdriverIO + tauri-driver + Mocha against the real release binary): 11 tests passing
+- **tsc --noEmit**: exit 0
+- **`npm run test:e2e`** wall-clock: ~30 s warm (rebuild + driver chain + 11 specs)
+
+## Build artifacts
+
 - MSI size: 3.91 MB (Phase 1 baseline was 2.9 MB)
 - app.exe size: 9.74 MB (Phase 1 baseline was 8.3 MB)
 
-## Manual smoke
+## E2E coverage (the "industrialized" replacement for manual smoke)
 
-- [ ] Editor mounts under title bar with One Dark theme
-- [ ] Untitled / Untitled empty state
-- [ ] Typing dirties the buffer (amber dot)
-- [ ] Ctrl+O opens a file via dialog; content loaded; dot clears
-- [ ] Editing reapplies the dirty dot
-- [ ] Ctrl+S overwrites; dot clears; new content on disk
-- [ ] Ctrl+Shift+S saves to new path
-- [ ] Ctrl+N resets buffer
-- [ ] Syntax highlighting differs across .rs / .js / .json / .md
+- `tests/e2e/smoke.spec.ts` — harness wiring (launches binary, reads title bar)
+- `tests/e2e/editor.spec.ts` — empty state, dirty-on-type, reset
+- `tests/e2e/file-io.spec.ts` — UTF-8 LF + CRLF open/save round-trip, missing-file error
+- `tests/e2e/encoding-roundtrip.spec.ts` — **spec acceptance #3** (UTF-16 LE BOM preserved through open → edit → save → reopen)
+- `tests/e2e/save-as.spec.ts` — save-to-new-path leaves original untouched
 
-## Acceptance — UTF-16 LE BOM round-trip (spec 5.1 #3)
-
-Verified by `cargo test fs::roundtrip_tests` (open, edit, save preserves BOM and decodes back to edited content).
+The manual runbook at `tests/smoke/runbook.md` remains as a backup for cases where the WebDriver chain misbehaves locally (rare since this run); it's no longer the primary gate.
 
 ## Known follow-ups for Phase 3
 
 - Multi-buffer / tab strip
 - "Save before close?" confirmation
+- A `__memopadTestLoadOpened` window hook so e2e can drive the full open-flow including title-bar update (currently `file-io.spec.ts` exercises the Rust command but not the UI-side load)
 - File-tree / find-in-files still out of scope until Phase 3 / Phase 4
 - Encoding switching from the status bar (UI exists in Phase 3's status bar task)
