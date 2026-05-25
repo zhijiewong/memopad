@@ -52,6 +52,15 @@ export default function App() {
         await doSave(true);
         return;
       }
+
+      if (key === 'n' && !e.shiftKey) {
+        e.preventDefault();
+        // Discard current buffer for now. Phase 3 introduces multi-buffer tabs
+        // and a "save before close?" prompt; in Phase 2 we trust the user
+        // (they can see the dirty indicator).
+        useBuffer.getState().reset();
+        return;
+      }
     };
 
     window.addEventListener('keydown', onKey);
