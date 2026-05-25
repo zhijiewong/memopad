@@ -105,7 +105,7 @@ Each unit does one thing, owns its state, and exposes a narrow interface.
 ### 3.2 Key data flow — keystroke to disk
 
 1. User types. CodeMirror emits a change. The `buffers` store updates in-memory content and the dirty flag.
-2. After 250 ms of idle, the UI sends `journal_snapshot(bufferId, currentContent)` over IPC. Rust appends one JSONL line containing the full buffer snapshot and fsyncs the journal file. Snapshots are used (not deltas) to keep the journal decoupled from CodeMirror's delta shape and to keep replay simple.
+2. After 250 ms of idle, the UI sends `journal_snapshot(bufferId, currentContent)` over IPC. Rust appends one JSONL line containing the full buffer snapshot and fsyncs the journal file. Snapshots are used (not deltas) to keep the journal decoupled from CodeMirror's delta shape and to keep replay simple. Each journal file retains only the most recent 10 snapshots; older lines are pruned on the next append to bound disk usage.
 3. On Ctrl+S, the UI sends `save_file(...)`. Rust writes the target file atomically (write to `<file>.tmp`, fsync, rename) and then calls `journal_clear(bufferId)`.
 
 ### 3.3 Startup flow
@@ -230,7 +230,6 @@ A five-minute checklist before each release: open a ~10 MB file, open a file in 
 
 ## 6. Risks and open questions
 
-- **Journal size growth.** Per-buffer snapshot files grow without bound while a buffer is unsaved. Mitigation: keep only the last N (e.g. 10) snapshots per buffer; rotate.
 - **CodeMirror 6 grammar coverage.** Some niche languages may need third-party Lezer grammars. Out of v1 scope to fix; v1 ships with a curated set (Rust, JS/TS, Python, Go, JSON, YAML, Markdown, HTML/CSS, shell, plain text).
 - **WebView2 install on older Windows.** Tauri requires WebView2. Windows 11 ships it; Windows 10 may not. The installer should bootstrap WebView2 when missing.
 - **Unsigned binary friction.** SmartScreen will warn until we obtain a code-signing certificate. Document the warning and the right-click → Properties → Unblock workaround in the README.
