@@ -11,9 +11,12 @@ Run once at the start of the test pass. Copies fixtures into a working directory
 ```powershell
 $ws = "$env:TEMP\memopad-smoke"
 Remove-Item -Recurse -Force $ws -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Path $ws | Out-Null
 Copy-Item -Recurse -Path 'E:\Github\memopad\tests\smoke\fixtures' -Destination $ws
-$ws  # echoes the working directory path; expect %TEMP%\memopad-smoke\fixtures
+Get-ChildItem "$ws\fixtures" | Select-Object Name, Length
 ```
+
+Expected: 8 items listed (sample.{rs,js,json,md}, utf8-lf.txt, utf8-crlf.txt, utf16le-bom.txt, .gitattributes). Fixtures path: `%TEMP%\memopad-smoke\fixtures\`.
 
 Then launch the app from the Start menu (assuming you installed the MSI from `src-tauri/target/release/bundle/msi/Memopad_0.1.0_x64_en-US.msi`).
 
