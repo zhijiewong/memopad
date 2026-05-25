@@ -197,3 +197,60 @@ mod decode_tests {
         assert!(out.contains('\u{FFFD}')); // replacement char
     }
 }
+
+/// Encode a String back to bytes for writing to disk.
+/// Re-emits the BOM for UTF-8 BOM, UTF-16 LE, and UTF-16 BE.
+pub fn encode_string(text: &str, encoding: Encoding) -> Vec<u8> {
+    match encoding {
+        Encoding::Utf8 => text.as_bytes().to_vec(),
+        Encoding::Utf8Bom => {
+            let mut out = Vec::with_capacity(text.len() + 3);
+            out.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+            out.extend_from_slice(text.as_bytes());
+            out
+        }
+        Encoding::Utf16Le => {
+            let mut out: Vec<u8> = vec![0xFF, 0xFE];
+            for code_unit in text.encode_utf16() {
+                out.extend_from_slice(&code_unit.to_le_bytes());
+            }
+            out
+        }
+        Encoding::Utf16Be => {
+            let mut out: Vec<u8> = vec![0xFE, 0xFF];
+            for code_unit in text.encode_utf16() {
+                out.extend_from_slice(&code_unit.to_be_bytes());
+            }
+            out
+        }
+    }
+}
+
+#[cfg(test)]
+mod encode_tests {
+    use super::*;
+
+    #[test]
+    fn encodes_plain_utf8_no_bom() {
+        let bytes = encode_string("hi", Encoding::Utf8);
+        assert_eq!(bytes, b"hi");
+    }
+
+    #[test]
+    fn encodes_utf8_bom_prepends_bom() {
+        let bytes = encode_string("hi", Encoding::Utf8Bom);
+        assert_eq!(bytes, b"\xEF\xBB\xBFhi");
+    }
+
+    #[test]
+    fn encodes_utf16_le_with_bom() {
+        let bytes = encode_string("hi", Encoding::Utf16Le);
+        assert_eq!(bytes, b"\xFF\xFEh\x00i\x00");
+    }
+
+    #[test]
+    fn encodes_utf16_be_with_bom() {
+        let bytes = encode_string("hi", Encoding::Utf16Be);
+        assert_eq!(bytes, b"\xFE\xFF\x00h\x00i");
+    }
+}
