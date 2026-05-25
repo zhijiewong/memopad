@@ -1,4 +1,4 @@
-import { getBrowser } from './driver';
+import { getBrowser, classicExecute } from './driver';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -87,11 +87,22 @@ export function md5(bytes: Buffer): string {
 
 /** Read the title bar's centered text — used to assert which file is open + dirty state. */
 export async function readTitleBarText(): Promise<{ name: string; dirty: boolean }> {
-  const browser = getBrowser();
-  const text = await browser.execute(() => {
-    const region = document.querySelector('.drag-region .pointer-events-none') as HTMLElement | null;
-    return region?.textContent ?? '';
-  });
+  // Use classicExecute() (raw HTTP /execute/sync) instead of browser.execute(),
+  // because WebdriverIO v9 routes execute() through WebDriver BiDi which targets
+  // a stale "about:blank" context in the wry/msedgedriver integration.
+  let text = '';
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    text = await classicExecute<string>(
+      `var r = document.querySelector('.drag-region .pointer-events-none');
+       return r ? r.textContent : '';`,
+    );
+    if (text && text.trim().length > 0) break;
+    await new Promise<void>((r) => setTimeout(r, 500));
+  }
+  if (!text || !text.trim()) {
+    throw new Error('Title bar text did not appear within 10 s');
+  }
   const name = text.replace(/●/g, '').trim();
   const dirty = text.includes('●');
   return { name, dirty };
