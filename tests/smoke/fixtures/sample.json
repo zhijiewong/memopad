@@ -1,0 +1,6 @@
+{
+  "name": "memopad",
+  "version": "0.1.0",
+  "features": ["tabs", "encoding-detection"],
+  "nested": { "depth": 2, "ok": true }
+}

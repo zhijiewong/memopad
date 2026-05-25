@@ -1,0 +1,3 @@
+# Fixture files have exact bytes the smoke test verifies against.
+# Disable any Git EOL/encoding conversion so they survive checkout untouched.
+* binary
