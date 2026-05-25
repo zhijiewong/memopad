@@ -320,3 +320,114 @@ mod open_file_tests {
         assert!(result.is_err());
     }
 }
+
+#[tauri::command]
+pub fn save_file(
+    path: String,
+    content: String,
+    encoding: Encoding,
+    eol: LineEnding,
+) -> Result<(), String> {
+    let _ = eol; // EOL of the file is determined by the bytes in `content` itself;
+                 // callers normalize line endings in the buffer before calling.
+                 // We accept the parameter for symmetry with `open_file` and future use.
+    use std::io::Write;
+
+    let bytes = encode_string(&content, encoding);
+    let target = std::path::PathBuf::from(&path);
+    let tmp = {
+        let mut t = target.clone();
+        let mut new_name = target
+            .file_name()
+            .ok_or_else(|| format!("invalid path: {}", path))?
+            .to_os_string();
+        new_name.push(".tmp");
+        t.set_file_name(new_name);
+        t
+    };
+
+    {
+        let mut f = std::fs::File::create(&tmp)
+            .map_err(|e| format!("create tmp {}: {}", tmp.display(), e))?;
+        f.write_all(&bytes)
+            .map_err(|e| format!("write tmp: {}", e))?;
+        f.sync_all()
+            .map_err(|e| format!("fsync tmp: {}", e))?;
+    }
+
+    std::fs::rename(&tmp, &target)
+        .map_err(|e| format!("rename {} -> {}: {}", tmp.display(), target.display(), e))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod save_file_tests {
+    use super::*;
+
+    fn tmp_path(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join("memopad_test_save");
+        std::fs::create_dir_all(&dir).unwrap();
+        dir.join(name)
+    }
+
+    #[test]
+    fn saves_utf8_no_bom() {
+        let path = tmp_path("out_utf8.txt");
+        let _ = std::fs::remove_file(&path);
+        save_file(
+            path.to_string_lossy().to_string(),
+            "hello\n".to_string(),
+            Encoding::Utf8,
+            LineEnding::Lf,
+        )
+        .unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(bytes, b"hello\n");
+    }
+
+    #[test]
+    fn saves_utf16_le_with_bom() {
+        let path = tmp_path("out_utf16le.txt");
+        let _ = std::fs::remove_file(&path);
+        save_file(
+            path.to_string_lossy().to_string(),
+            "hi".to_string(),
+            Encoding::Utf16Le,
+            LineEnding::Lf,
+        )
+        .unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(bytes, b"\xFF\xFEh\x00i\x00");
+    }
+
+    #[test]
+    fn save_does_not_leave_tmp_file_behind() {
+        let path = tmp_path("out_clean.txt");
+        let tmp = path.with_extension("txt.tmp");
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&tmp);
+        save_file(
+            path.to_string_lossy().to_string(),
+            "x".to_string(),
+            Encoding::Utf8,
+            LineEnding::Lf,
+        )
+        .unwrap();
+        assert!(path.exists(), "final file should exist");
+        assert!(!tmp.exists(), "temp file should have been renamed away");
+    }
+
+    #[test]
+    fn save_overwrites_existing_file() {
+        let path = tmp_path("out_overwrite.txt");
+        std::fs::write(&path, b"old contents").unwrap();
+        save_file(
+            path.to_string_lossy().to_string(),
+            "new".to_string(),
+            Encoding::Utf8,
+            LineEnding::Lf,
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"new");
+    }
+}
