@@ -254,3 +254,69 @@ mod encode_tests {
         assert_eq!(bytes, b"\xFE\xFF\x00h\x00i");
     }
 }
+
+#[tauri::command]
+pub fn open_file(path: String) -> Result<OpenedFile, String> {
+    let bytes = std::fs::read(&path).map_err(|e| format!("read {}: {}", path, e))?;
+    let (encoding, _bom_offset) = detect_encoding(&bytes);
+    let content = decode_bytes(&bytes, encoding);
+    let eol = detect_line_ending(&content);
+    Ok(OpenedFile {
+        path,
+        content,
+        encoding,
+        eol,
+    })
+}
+
+#[cfg(test)]
+mod open_file_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn write_tmp(name: &str, bytes: &[u8]) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join("memopad_test_open");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(name);
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(bytes).unwrap();
+        path
+    }
+
+    #[test]
+    fn opens_utf8_lf_file() {
+        let path = write_tmp("utf8_lf.txt", b"hello\nworld\n");
+        let opened = open_file(path.to_string_lossy().to_string()).unwrap();
+        assert_eq!(opened.content, "hello\nworld\n");
+        assert_eq!(opened.encoding, Encoding::Utf8);
+        assert_eq!(opened.eol, LineEnding::Lf);
+    }
+
+    #[test]
+    fn opens_utf8_crlf_file() {
+        let path = write_tmp("utf8_crlf.txt", b"hello\r\nworld\r\n");
+        let opened = open_file(path.to_string_lossy().to_string()).unwrap();
+        assert_eq!(opened.content, "hello\r\nworld\r\n");
+        assert_eq!(opened.encoding, Encoding::Utf8);
+        assert_eq!(opened.eol, LineEnding::Crlf);
+    }
+
+    #[test]
+    fn opens_utf16_le_bom_file() {
+        // "hi\n" in UTF-16 LE with BOM
+        let path = write_tmp(
+            "utf16le.txt",
+            b"\xFF\xFEh\x00i\x00\n\x00",
+        );
+        let opened = open_file(path.to_string_lossy().to_string()).unwrap();
+        assert_eq!(opened.content, "hi\n");
+        assert_eq!(opened.encoding, Encoding::Utf16Le);
+        assert_eq!(opened.eol, LineEnding::Lf);
+    }
+
+    #[test]
+    fn missing_file_returns_error() {
+        let result = open_file("Z:\\does\\not\\exist.txt".to_string());
+        assert!(result.is_err());
+    }
+}
