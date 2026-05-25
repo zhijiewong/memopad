@@ -431,3 +431,49 @@ mod save_file_tests {
         assert_eq!(std::fs::read(&path).unwrap(), b"new");
     }
 }
+
+#[cfg(test)]
+mod roundtrip_tests {
+    use super::*;
+
+    /// Spec acceptance #3: open a UTF-16 LE BOM file, edit, save -> bytes preserved.
+    #[test]
+    fn utf16_le_bom_roundtrip_preserves_bom_and_encoding() {
+        let dir = std::env::temp_dir().join("memopad_test_roundtrip");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("rt.txt");
+
+        // Original bytes: BOM + "hello\n" in UTF-16 LE
+        let original: Vec<u8> = {
+            let mut v: Vec<u8> = vec![0xFF, 0xFE];
+            for u in "hello\n".encode_utf16() {
+                v.extend_from_slice(&u.to_le_bytes());
+            }
+            v
+        };
+        std::fs::write(&path, &original).unwrap();
+
+        let opened = open_file(path.to_string_lossy().to_string()).unwrap();
+        assert_eq!(opened.encoding, Encoding::Utf16Le);
+        assert_eq!(opened.content, "hello\n");
+
+        // Edit the content
+        let edited = opened.content + "world\n";
+
+        save_file(
+            path.to_string_lossy().to_string(),
+            edited.clone(),
+            opened.encoding,
+            opened.eol,
+        )
+        .unwrap();
+
+        let after = std::fs::read(&path).unwrap();
+        // BOM still present
+        assert_eq!(&after[..2], &[0xFF, 0xFE]);
+        // Re-decoding gives back the edited content
+        let reopened = open_file(path.to_string_lossy().to_string()).unwrap();
+        assert_eq!(reopened.content, edited);
+        assert_eq!(reopened.encoding, Encoding::Utf16Le);
+    }
+}
