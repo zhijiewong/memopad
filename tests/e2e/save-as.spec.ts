@@ -13,7 +13,7 @@ describe('save-as semantics', () => {
 
     // Simulate "save as" to a new path within the same temp dir
     const newPath = path.join(path.dirname(original), 'saved-as.txt');
-    await saveFile(newPath, 'save-as test\n', 'utf8', 'lf');
+    await saveFile(newPath, 'save-as test\n', 'utf-8', 'lf');
 
     // New file exists with the content we wrote
     const newBytes = readBytes(newPath);

@@ -4,11 +4,17 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
 pub enum Encoding {
+    // Explicit renames produce canonical IANA-style charset labels on the wire
+    // (utf-8, utf-16-le, ...) — kebab-case alone would emit "utf8" because
+    // PascalCase `Utf8` has no internal word boundary.
+    #[serde(rename = "utf-8")]
     Utf8,
+    #[serde(rename = "utf-8-bom")]
     Utf8Bom,
+    #[serde(rename = "utf-16-le")]
     Utf16Le,
+    #[serde(rename = "utf-16-be")]
     Utf16Be,
 }
 

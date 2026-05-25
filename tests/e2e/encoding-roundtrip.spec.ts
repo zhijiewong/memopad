@@ -9,7 +9,7 @@ describe('UTF-16 LE BOM round-trip (spec acceptance #3)', () => {
   it('open -> edit -> save preserves the BOM and decoded content', async () => {
     const path = prepareFixture('utf16le-bom.txt');
     const opened = await openFile(path);
-    expect(opened.encoding).to.equal('utf16-le');
+    expect(opened.encoding).to.equal('utf-16-le');
     expect(opened.content).to.equal('hi\n');
 
     const edited = opened.content + 'world\n';
@@ -30,6 +30,6 @@ describe('UTF-16 LE BOM round-trip (spec acceptance #3)', () => {
     // And reopening yields the edited content with same encoding.
     const reopened = await openFile(path);
     expect(reopened.content).to.equal(edited);
-    expect(reopened.encoding).to.equal('utf16-le');
+    expect(reopened.encoding).to.equal('utf-16-le');
   });
 });

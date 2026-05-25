@@ -9,7 +9,7 @@ describe('file I/O', () => {
   it('open UTF-8 LF file populates buffer + clean title bar', async () => {
     const path = prepareFixture('utf8-lf.txt');
     const opened = await openFile(path);
-    expect(opened.encoding).to.equal('utf8');
+    expect(opened.encoding).to.equal('utf-8');
     expect(opened.eol).to.equal('lf');
     expect(opened.content).to.equal('hello\nworld\n');
 
