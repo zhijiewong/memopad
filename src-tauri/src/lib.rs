@@ -1,3 +1,5 @@
+mod fs;
+
 #[tauri::command]
 fn window_minimize(window: tauri::Window) -> Result<(), String> {
     window.minimize().map_err(|e| e.to_string())
