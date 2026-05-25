@@ -143,3 +143,57 @@ mod eol_tests {
         assert_eq!(detect_line_ending("a\r\nb\r\nc\r\nd\ne"), LineEnding::Crlf);
     }
 }
+
+/// Decode file bytes to a Rust String according to the detected encoding.
+/// Strips the BOM if present. Falls back to `replacement_character` for any
+/// invalid byte sequence (lossy decode, never panics).
+pub fn decode_bytes(bytes: &[u8], encoding: Encoding) -> String {
+    use encoding_rs::{UTF_16BE, UTF_16LE, UTF_8};
+    let enc = match encoding {
+        Encoding::Utf8 | Encoding::Utf8Bom => UTF_8,
+        Encoding::Utf16Le => UTF_16LE,
+        Encoding::Utf16Be => UTF_16BE,
+    };
+    // `decode` strips BOM if present and substitutes U+FFFD on errors.
+    let (text, _enc_used, _had_errors) = enc.decode(bytes);
+    text.into_owned()
+}
+
+#[cfg(test)]
+mod decode_tests {
+    use super::*;
+
+    #[test]
+    fn decodes_plain_utf8() {
+        let bytes = "hello".as_bytes();
+        assert_eq!(decode_bytes(bytes, Encoding::Utf8), "hello");
+    }
+
+    #[test]
+    fn decodes_utf8_bom_strips_bom() {
+        let bytes = b"\xEF\xBB\xBFhi";
+        assert_eq!(decode_bytes(bytes, Encoding::Utf8Bom), "hi");
+    }
+
+    #[test]
+    fn decodes_utf16_le_bom() {
+        // "hi" in UTF-16 LE with BOM
+        let bytes = b"\xFF\xFEh\x00i\x00";
+        assert_eq!(decode_bytes(bytes, Encoding::Utf16Le), "hi");
+    }
+
+    #[test]
+    fn decodes_utf16_be_bom() {
+        // "hi" in UTF-16 BE with BOM
+        let bytes = b"\xFE\xFF\x00h\x00i";
+        assert_eq!(decode_bytes(bytes, Encoding::Utf16Be), "hi");
+    }
+
+    #[test]
+    fn invalid_utf8_replaced_not_panic() {
+        let bytes = b"valid\xFFinvalid";
+        let out = decode_bytes(bytes, Encoding::Utf8);
+        assert!(out.contains("valid"));
+        assert!(out.contains('\u{FFFD}')); // replacement char
+    }
+}
