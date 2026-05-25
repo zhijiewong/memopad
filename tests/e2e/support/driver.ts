@@ -5,6 +5,7 @@ import treeKill from 'tree-kill';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 const RELEASE_BIN = path.join(
@@ -17,9 +18,14 @@ const RELEASE_BIN = path.join(
 const TAURI_DRIVER = process.env.TAURI_DRIVER_PATH
   ?? path.join(process.env.USERPROFILE ?? '', '.cargo', 'bin', 'tauri-driver.exe');
 const TAURI_DRIVER_PORT = 4444;
+// Fixed port for msedgedriver; tauri-driver proxies to it.
+const EDGE_DRIVER_PORT = 9515;
+// Path where the edgedriver npm package caches the msedgedriver binary (os.tmpdir() by default).
+const MSEDGEDRIVER_BIN = process.env.EDGEDRIVER_PATH
+  ?? path.join(os.tmpdir(), process.platform === 'win32' ? 'msedgedriver.exe' : 'msedgedriver');
 
 let tauriDriver: ChildProcess | undefined;
-let edgedriverStopper: (() => Promise<void>) | undefined;
+let edgedriverProc: ChildProcess | undefined;
 
 declare global {
   // eslint-disable-next-line no-var
@@ -43,20 +49,17 @@ export async function startDriverAndSession(): Promise<Browser> {
     throw new Error(`tauri-driver not found at ${TAURI_DRIVER}.`);
   }
 
-  // Start msedgedriver via the npm edgedriver package; capture its port + stop fn.
-  const edge = await startEdgedriver({ port: 0 } as Parameters<typeof startEdgedriver>[0]);
-  const edgePort = (edge as unknown as { port: number }).port;
-  edgedriverStopper = async () => {
-    const stop = (edge as unknown as { stop?: () => Promise<void> }).stop;
-    if (stop) await stop();
-  };
+  // Start msedgedriver via the npm edgedriver package on a fixed port.
+  // edgedriver.start() returns a raw ChildProcess (not { port, stop }).
+  edgedriverProc = await startEdgedriver({ port: EDGE_DRIVER_PORT });
 
   // Spawn tauri-driver and have it proxy to the running msedgedriver.
   tauriDriver = spawn(
     TAURI_DRIVER,
     [
       '--port', String(TAURI_DRIVER_PORT),
-      '--native-port', String(edgePort),
+      '--native-port', String(EDGE_DRIVER_PORT),
+      '--native-driver', MSEDGEDRIVER_BIN,
     ],
     { stdio: 'pipe' },
   );
@@ -95,8 +98,10 @@ export async function stopDriverAndSession(): Promise<void> {
     );
     tauriDriver = undefined;
   }
-  if (edgedriverStopper) {
-    try { await edgedriverStopper(); } catch { /* ignore */ }
-    edgedriverStopper = undefined;
+  if (edgedriverProc?.pid) {
+    await new Promise<void>((resolve) =>
+      treeKill(edgedriverProc!.pid!, 'SIGTERM', () => resolve()),
+    );
+    edgedriverProc = undefined;
   }
 }
