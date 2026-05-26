@@ -8,7 +8,7 @@ import { registerBuiltins } from './commands/builtins';
 import { useBuffers } from './stores/buffers';
 import { startJournalDebounce } from './lib/journal-debounce';
 import { bootRestore } from './lib/boot';
-import { sessionSave } from './lib/tauri';
+import { sessionSave, statFile } from './lib/tauri';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 registerBuiltins();
@@ -28,27 +28,63 @@ async function persistSession() {
   });
 }
 
+async function recordStatsForBuffersWithoutOne() {
+  const state = useBuffers.getState();
+  for (const b of state.buffers) {
+    if (b.recordedStat || !b.path) continue;
+    try {
+      const stat = await statFile(b.path);
+      useBuffers.getState().recordStat(b.id, stat);
+    } catch { /* ignore */ }
+  }
+}
+
+async function rescanExternalChanges() {
+  const state = useBuffers.getState();
+  for (const b of state.buffers) {
+    if (!b.path) continue;
+    try {
+      const stat = await statFile(b.path);
+      const prev = b.recordedStat;
+      if (!prev) {
+        useBuffers.getState().recordStat(b.id, stat);
+        continue;
+      }
+      if (stat.mtime_ms !== prev.mtime_ms || stat.size !== prev.size) {
+        useBuffers.getState().setExternalChange(b.id, true);
+      }
+    } catch {
+      // File deleted under us — surface as external change too.
+      useBuffers.getState().setExternalChange(b.id, true);
+    }
+  }
+}
+
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
-    bootRestore().catch((err) => console.error('boot failed:', err));
-    const stopJournal = startJournalDebounce();
+    bootRestore()
+      .then(() => recordStatsForBuffersWithoutOne())
+      .catch((err) => console.error('boot failed:', err));
 
-    // Persist session whenever buffers change (debounced via store ticks; cheap JSON write).
+    const stopJournal = startJournalDebounce();
     const stopSessionWatcher = useBuffers.subscribe(() => {
       persistSession().catch(() => {});
+      recordStatsForBuffersWithoutOne().catch(() => {});
     });
-
-    // Also persist before the window closes.
-    const unlistenPromise = getCurrentWindow().onCloseRequested(async () => {
+    const unlistenCloseP = getCurrentWindow().onCloseRequested(async () => {
       await persistSession();
+    });
+    const unlistenFocusP = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (focused) rescanExternalChanges().catch(() => {});
     });
 
     return () => {
       stopJournal();
       stopSessionWatcher();
-      unlistenPromise.then((un) => un()).catch(() => {});
+      unlistenCloseP.then((un) => un()).catch(() => {});
+      unlistenFocusP.then((un) => un()).catch(() => {});
     };
   }, []);
 

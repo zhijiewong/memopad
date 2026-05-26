@@ -3,6 +3,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView } from '@codemirror/view';
 import { useBuffers, selectActive } from '../stores/buffers';
 import { languageForPath } from '../lib/language';
+import { ExternalChangeBanner } from './ExternalChangeBanner';
 
 const editorTheme = EditorView.theme({
   '&': { height: '100%', fontSize: '13px' },
@@ -23,22 +24,27 @@ export function Editor() {
   }
 
   return (
-    <CodeMirror
-      key={active.id}
-      value={active.content}
-      height="100%"
-      theme={oneDark}
-      extensions={[editorTheme, ...languageForPath(active.path)]}
-      onChange={setActiveContent}
-      basicSetup={{
-        lineNumbers: true,
-        foldGutter: false,
-        highlightActiveLine: true,
-        bracketMatching: true,
-        closeBrackets: true,
-        autocompletion: false,
-        indentOnInput: true,
-      }}
-    />
+    <div className="flex h-full flex-col">
+      <ExternalChangeBanner />
+      <div className="flex-1 overflow-hidden">
+        <CodeMirror
+          key={active.id}
+          value={active.content}
+          height="100%"
+          theme={oneDark}
+          extensions={[editorTheme, ...languageForPath(active.path)]}
+          onChange={setActiveContent}
+          basicSetup={{
+            lineNumbers: true,
+            foldGutter: false,
+            highlightActiveLine: true,
+            bracketMatching: true,
+            closeBrackets: true,
+            autocompletion: false,
+            indentOnInput: true,
+          }}
+        />
+      </div>
+    </div>
   );
 }
