@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { useBuffers, selectActive } from '../stores/buffers';
 import { openFile, statFile } from '../lib/tauri';
+import { DiffModal } from './DiffModal';
 
 export function ExternalChangeBanner() {
   const active = useBuffers(selectActive);
+  const [diffOpen, setDiffOpen] = useState(false);
+
   if (!active || !active.externalChange || !active.path) return null;
 
   const onReload = async () => {
@@ -33,36 +37,46 @@ export function ExternalChangeBanner() {
   };
 
   return (
-    <div
-      role="status"
-      data-external-change-banner
-      className="flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200"
-    >
-      <span>This file changed on disk since you opened it.</span>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onReload}
-          className="rounded border border-amber-500/50 px-2 py-0.5 hover:bg-amber-500/20"
-        >
-          Reload
-        </button>
-        <button
-          type="button"
-          onClick={onKeepMine}
-          className="rounded border border-neutral-600 px-2 py-0.5 hover:bg-neutral-800"
-        >
-          Keep mine
-        </button>
-        <button
-          type="button"
-          disabled
-          title="Diff view ships in Phase 5"
-          className="cursor-not-allowed rounded border border-neutral-700 px-2 py-0.5 text-neutral-500"
-        >
-          Diff
-        </button>
+    <>
+      <div
+        role="status"
+        data-external-change-banner
+        className="flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200"
+      >
+        <span>This file changed on disk since you opened it.</span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onReload}
+            className="rounded border border-amber-500/50 px-2 py-0.5 hover:bg-amber-500/20"
+          >
+            Reload
+          </button>
+          <button
+            type="button"
+            onClick={onKeepMine}
+            className="rounded border px-2 py-0.5 hover:bg-neutral-800"
+            style={{ borderColor: 'var(--app-border)' }}
+          >
+            Keep mine
+          </button>
+          <button
+            type="button"
+            onClick={() => setDiffOpen(true)}
+            className="rounded border px-2 py-0.5"
+            style={{ borderColor: 'var(--app-border)', color: 'var(--app-fg)' }}
+          >
+            Diff
+          </button>
+        </div>
       </div>
-    </div>
+      {diffOpen && (
+        <DiffModal
+          bufferPath={active.path}
+          bufferContent={active.content}
+          onClose={() => setDiffOpen(false)}
+        />
+      )}
+    </>
   );
 }
