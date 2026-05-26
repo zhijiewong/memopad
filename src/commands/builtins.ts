@@ -2,6 +2,7 @@ import { useBuffers, selectActive } from '../stores/buffers';
 import { openFile, saveFile, revealInExplorer } from '../lib/tauri';
 import { pickFileToOpen, pickFileToSave } from '../lib/dialog';
 import { useCommands } from './registry';
+import { useTheme } from '../stores/theme';
 
 async function doOpen() {
   const path = await pickFileToOpen();
@@ -94,5 +95,39 @@ export function registerBuiltins() {
       const a = selectActive(useBuffers.getState());
       if (a?.path) revealInExplorer(a.path).catch(console.error);
     },
+  });
+
+  register({
+    id: 'theme.toggle',
+    title: 'View: Toggle Theme (Dark / Light / System)',
+    run: () => useTheme.getState().toggle(),
+  });
+  register({
+    id: 'theme.dark',
+    title: 'View: Use Dark Theme',
+    run: () => useTheme.getState().set('dark'),
+  });
+  register({
+    id: 'theme.light',
+    title: 'View: Use Light Theme',
+    run: () => useTheme.getState().set('light'),
+  });
+  register({
+    id: 'theme.system',
+    title: 'View: Use System Theme',
+    run: () => useTheme.getState().set('system'),
+  });
+
+  register({
+    id: 'edit.find',
+    title: 'Edit: Find',
+    shortcut: 'Ctrl+F',
+    run: () => globalThis.__memopadSearchPanel?.open('find'),
+  });
+  register({
+    id: 'edit.replace',
+    title: 'Edit: Replace',
+    shortcut: 'Ctrl+H',
+    run: () => globalThis.__memopadSearchPanel?.open('replace'),
   });
 }

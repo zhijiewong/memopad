@@ -34,7 +34,10 @@ export function TabStrip() {
 
   if (buffers.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-xs tracking-wide text-neutral-500">
+      <div
+        className="flex h-full items-center justify-center text-xs tracking-wide"
+        style={{ color: 'var(--app-fg-dim)' }}
+      >
         Memopad
       </div>
     );
@@ -88,17 +91,22 @@ export function TabStrip() {
                 setCtx({ x: e.clientX, y: e.clientY, bufferId: b.id });
               }}
               className={
-                'group flex h-full max-w-[200px] cursor-pointer items-center gap-1 border-r border-neutral-800 px-3 text-xs '
+                'group flex h-full max-w-[200px] cursor-pointer items-center gap-1 border-r px-3 text-xs '
                 + (isActive
-                  ? 'bg-neutral-950 text-neutral-100 shadow-[inset_0_-2px_0_0_theme(colors.amber.400)]'
-                  : 'text-neutral-400 hover:bg-neutral-800/60')
+                  ? 'shadow-[inset_0_-2px_0_0_var(--app-accent)]'
+                  : '')
                 + (dragId === b.id ? ' opacity-50' : '')
               }
+              style={{
+                borderColor: 'var(--app-border)',
+                background: isActive ? 'var(--app-tab-active-bg)' : undefined,
+                color: isActive ? 'var(--app-fg)' : 'var(--app-fg-muted)',
+              }}
               title={b.path ?? name}
             >
               <span className="truncate">{name}</span>
               {b.dirty && (
-                <span aria-label="Unsaved changes" className="text-amber-400">●</span>
+                <span aria-label="Unsaved changes" style={{ color: 'var(--app-accent)' }}>●</span>
               )}
             </div>
           );

@@ -35,11 +35,14 @@ export function StatusBar() {
   const [eolRect, setEolRect] = useState<DOMRect | null>(null);
 
   if (!active) {
-    return <div className="h-6 border-t border-neutral-800 bg-neutral-900" />;
+    return <div className="h-6 border-t" style={{ borderColor: 'var(--app-border)', background: 'var(--app-bg)' }} />;
   }
 
   return (
-    <div className="flex h-6 select-none items-center gap-3 border-t border-neutral-800 bg-neutral-900 px-3 text-[11px] text-neutral-400">
+    <div
+      className="flex h-6 select-none items-center gap-3 border-t px-3 text-[11px]"
+      style={{ borderColor: 'var(--app-border)', background: 'var(--app-bg)', color: 'var(--app-fg-muted)' }}
+    >
       <span data-status-segment="language">{languageLabel(active.path)}</span>
 
       <button

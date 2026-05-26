@@ -6,9 +6,11 @@ import { StatusBar } from './components/StatusBar';
 import { useCommands } from './commands/registry';
 import { registerBuiltins } from './commands/builtins';
 import { useBuffers } from './stores/buffers';
+import { useTheme, effectiveTheme } from './stores/theme';
 import { startJournalDebounce } from './lib/journal-debounce';
 import { bootRestore } from './lib/boot';
-import { sessionSave, statFile } from './lib/tauri';
+import { statFile } from './lib/tauri';
+import { scheduleSessionSave } from './lib/session-debounce';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 registerBuiltins();
@@ -20,9 +22,9 @@ function runCommand(id: string) {
   cmd.run();
 }
 
-async function persistSession() {
+function persistSession() {
   const state = useBuffers.getState();
-  await sessionSave({
+  scheduleSessionSave({
     tabs: state.buffers.map((b) => ({ buffer_id: b.id, path: b.path })),
     active_id: state.activeId,
   });
@@ -63,6 +65,13 @@ async function rescanExternalChanges() {
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  const themeMode = useTheme((s) => s.mode);
+  useEffect(() => {
+    const cls = effectiveTheme(themeMode) === 'dark' ? 'theme-dark' : 'theme-light';
+    document.documentElement.classList.remove('theme-dark', 'theme-light');
+    document.documentElement.classList.add(cls);
+  }, [themeMode]);
+
   useEffect(() => {
     bootRestore()
       .then(() => recordStatsForBuffersWithoutOne())
@@ -70,7 +79,7 @@ export default function App() {
 
     const stopJournal = startJournalDebounce();
     const stopSessionWatcher = useBuffers.subscribe(() => {
-      persistSession().catch(() => {});
+      persistSession();
       recordStatsForBuffersWithoutOne().catch(() => {});
     });
     // No onCloseRequested handler: the store subscription above already
@@ -96,6 +105,16 @@ export default function App() {
       if (!mod) return;
       const key = e.key.toLowerCase();
 
+      if (key === 'f' && !e.shiftKey) {
+        e.preventDefault();
+        globalThis.__memopadSearchPanel?.open('find');
+        return;
+      }
+      if (key === 'h' && !e.shiftKey) {
+        e.preventDefault();
+        globalThis.__memopadSearchPanel?.open('replace');
+        return;
+      }
       if (key === 'k' && !e.shiftKey) { e.preventDefault(); setPaletteOpen(true); return; }
       if (key === 'p' && e.shiftKey)  { e.preventDefault(); setPaletteOpen(true); return; }
       if (key === 'o' && !e.shiftKey) { e.preventDefault(); runCommand('file.open'); return; }
