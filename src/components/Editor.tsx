@@ -17,7 +17,7 @@ export function Editor() {
 
   if (!active) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-neutral-500">
+      <div className="flex h-full w-full items-center justify-center text-xs text-neutral-500">
         Ctrl+O to open · Ctrl+N to start typing
       </div>
     );
