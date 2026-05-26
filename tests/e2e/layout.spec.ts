@@ -112,4 +112,44 @@ describe('layout invariants', () => {
     expect(tb!.bottom).to.be.lessThanOrEqual(mainRect!.y);
     expect(mainRect!.bottom).to.be.lessThanOrEqual(enc!.y);
   });
+
+  it('CodeMirror accepts focus and shows content from the store (catches CM6 height collapse)', async () => {
+    await exec(() => {
+      const w = window as unknown as {
+        __memopadTestNewBuffer: () => string;
+        __memopadTestSetContent: (s: string) => void;
+      };
+      w.__memopadTestNewBuffer();
+      w.__memopadTestSetContent('line one\nline two\nline three');
+    });
+    await new Promise((r) => setTimeout(r, 400));
+
+    const info = await classicExecute<{
+      cmContentRect: { w: number; h: number } | null;
+      gutterRect: { w: number; h: number } | null;
+      visibleText: string;
+      lineCount: number;
+    }>(
+      `var content = document.querySelector('.cm-content');
+       var gutter = document.querySelector('.cm-gutter');
+       var lines = document.querySelectorAll('.cm-line');
+       return {
+         cmContentRect: content ? { w: content.getBoundingClientRect().width, h: content.getBoundingClientRect().height } : null,
+         gutterRect: gutter ? { w: gutter.getBoundingClientRect().width, h: gutter.getBoundingClientRect().height } : null,
+         visibleText: Array.from(lines).map(l => l.textContent).join('\\n'),
+         lineCount: lines.length,
+       };`,
+    );
+
+    expect(info.cmContentRect, 'cm-content (the text area) must exist').to.not.equal(null);
+    // The text content area (not the gutter) must be wide enough to hold real text:
+    expect(info.cmContentRect!.w, 'cm-content width').to.be.greaterThan(500);
+    expect(info.cmContentRect!.h, 'cm-content height').to.be.greaterThan(100);
+    // The gutter should be narrow (line numbers only):
+    expect(info.gutterRect!.w, 'gutter should be narrow').to.be.lessThan(60);
+    // Visible text matches what we put in the store:
+    expect(info.lineCount).to.equal(3);
+    expect(info.visibleText).to.include('line one');
+    expect(info.visibleText).to.include('line three');
+  });
 });
