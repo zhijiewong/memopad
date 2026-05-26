@@ -1,86 +1,51 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { Editor } from './components/Editor';
-import { useBuffers, selectActive } from './stores/buffers';
-import { openFile, saveFile } from './lib/tauri';
-import { pickFileToOpen, pickFileToSave } from './lib/dialog';
+import { CommandPalette } from './components/CommandPalette';
+import { useCommands } from './commands/registry';
+import { registerBuiltins } from './commands/builtins';
 
-async function doOpen() {
-  const path = await pickFileToOpen();
-  if (!path) return;
-  try {
-    const opened = await openFile(path);
-    useBuffers.getState().openBuffer(opened);
-  } catch (err) {
-    console.error('open failed:', err);
-  }
-}
+registerBuiltins();
 
-async function doSave(saveAs: boolean) {
-  const active = selectActive(useBuffers.getState());
-  if (!active) return;
-  let path = active.path;
-  if (!path || saveAs) {
-    const picked = await pickFileToSave(path);
-    if (!picked) return;
-    path = picked;
-  }
-  try {
-    await saveFile(path, active.content, active.encoding, active.eol);
-    useBuffers.getState().markSaved(active.id, path);
-  } catch (err) {
-    console.error('save failed:', err);
-  }
+function runCommand(id: string) {
+  const cmd = useCommands.getState().commands.find((c) => c.id === id);
+  if (!cmd) return;
+  useCommands.getState().recordUsed(id);
+  cmd.run();
 }
 
 export default function App() {
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
   useEffect(() => {
     const onKey = async (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const key = e.key.toLowerCase();
 
-      if (key === 'o' && !e.shiftKey) {
+      // Command palette
+      if (key === 'k' && !e.shiftKey) {
         e.preventDefault();
-        await doOpen();
+        setPaletteOpen(true);
         return;
       }
-      if (key === 's' && !e.shiftKey) {
+      if (key === 'p' && e.shiftKey) {
         e.preventDefault();
-        await doSave(false);
+        setPaletteOpen(true);
         return;
       }
-      if (key === 's' && e.shiftKey) {
-        e.preventDefault();
-        await doSave(true);
-        return;
-      }
-      if (key === 'n' && !e.shiftKey) {
-        e.preventDefault();
-        useBuffers.getState().newBuffer();
-        return;
-      }
-      if (key === 'w' && !e.shiftKey) {
-        e.preventDefault();
-        const id = useBuffers.getState().activeId;
-        if (id) useBuffers.getState().closeBuffer(id);
-        return;
-      }
-      if (key === 't' && e.shiftKey) {
-        e.preventDefault();
-        useBuffers.getState().reopenLastClosed();
-        return;
-      }
-      if (key === 'tab') {
-        e.preventDefault();
-        const { buffers, activeId } = useBuffers.getState();
-        if (buffers.length < 2) return;
-        const idx = buffers.findIndex((b) => b.id === activeId);
-        const dir = e.shiftKey ? -1 : 1;
-        const nextIdx = (idx + dir + buffers.length) % buffers.length;
-        useBuffers.getState().switchTo(buffers[nextIdx].id);
-        return;
-      }
+
+      // File ops
+      if (key === 'o' && !e.shiftKey) { e.preventDefault(); runCommand('file.open'); return; }
+      if (key === 's' && !e.shiftKey) { e.preventDefault(); runCommand('file.save'); return; }
+      if (key === 's' && e.shiftKey)  { e.preventDefault(); runCommand('file.saveAs'); return; }
+      if (key === 'n' && !e.shiftKey) { e.preventDefault(); runCommand('file.new'); return; }
+
+      // Tab ops
+      if (key === 'w' && !e.shiftKey) { e.preventDefault(); runCommand('tab.close'); return; }
+      if (key === 't' && e.shiftKey)  { e.preventDefault(); runCommand('tab.reopen'); return; }
+      if (key === 'tab' && !e.shiftKey) { e.preventDefault(); runCommand('tab.next'); return; }
+      if (key === 'tab' && e.shiftKey)  { e.preventDefault(); runCommand('tab.prev'); return; }
     };
 
     window.addEventListener('keydown', onKey);
@@ -93,6 +58,10 @@ export default function App() {
       <main className="flex flex-1 overflow-hidden">
         <Editor />
       </main>
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} onRun={runCommand} />}
     </div>
   );
 }
+
+// expose runCommand for the e2e tests (used by palette.spec.ts)
+(window as unknown as { __memopadTestRunCommand?: (id: string) => void }).__memopadTestRunCommand = runCommand;
