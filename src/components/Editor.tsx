@@ -24,13 +24,14 @@ export function Editor() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full w-full flex-col">
       <ExternalChangeBanner />
-      <div className="flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         <CodeMirror
           key={active.id}
           value={active.content}
           height="100%"
+          style={{ height: '100%' }}
           theme={oneDark}
           extensions={[editorTheme, ...languageForPath(active.path)]}
           onChange={setActiveContent}
