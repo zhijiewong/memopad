@@ -223,4 +223,31 @@ describe('buffers store', () => {
     expect(b.externalChange).to.equal(false);
     expect(s.activeId).to.equal(id);
   });
+
+  it('setCursor stores cursor offset without marking dirty', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: '/tmp/c.txt',
+      content: 'hello world',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    expect(useBuffers.getState().buffers[0].dirty).to.equal(false);
+    useBuffers.getState().setCursor(id, 6);
+    const s = useBuffers.getState();
+    expect(s.buffers[0].cursor).to.equal(6);
+    expect(s.buffers[0].dirty).to.equal(false);
+  });
+
+  it('setScrollTop stores scroll position without marking dirty', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: '/tmp/s.txt',
+      content: 'long file',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    useBuffers.getState().setScrollTop(id, 240);
+    const s = useBuffers.getState();
+    expect(s.buffers[0].scrollTop).to.equal(240);
+    expect(s.buffers[0].dirty).to.equal(false);
+  });
 });

@@ -9,3 +9,9 @@ vite.config.js
 vite.config.d.ts
 .superpowers/
 tests/e2e/*.png
+
+# Tauri signing artifacts (per-developer)
+*.key
+
+# Tauri's bundled WiX downloader output
+src-tauri/WixTools/

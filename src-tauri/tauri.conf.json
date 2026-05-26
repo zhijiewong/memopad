@@ -28,6 +28,16 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/GITHUB_OWNER/memopad/releases/latest/download/latest.json"
+      ],
+      "pubkey": "PLACEHOLDER_REPLACE_WITH_REAL_PUBKEY_BEFORE_FIRST_RELEASE",
+      "dialog": false
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis"],
