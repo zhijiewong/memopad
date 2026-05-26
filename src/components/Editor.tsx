@@ -1,5 +1,7 @@
 import CodeMirror from '@uiw/react-codemirror';
-import { oneDark } from '@codemirror/theme-one-dark';
+import { useTheme, effectiveTheme } from '../stores/theme';
+import { memopadDark } from '../editor/memopad-dark';
+import { memopadLight } from '../editor/memopad-light';
 import { EditorView } from '@codemirror/view';
 import { useBuffers, selectActive } from '../stores/buffers';
 import { languageForPath } from '../lib/language';
@@ -14,6 +16,8 @@ const editorTheme = EditorView.theme({
 export function Editor() {
   const active = useBuffers(selectActive);
   const setActiveContent = useBuffers((s) => s.setActiveContent);
+  const themeMode = useTheme((s) => s.mode);
+  const themeExt = effectiveTheme(themeMode) === 'dark' ? memopadDark : memopadLight;
 
   if (!active) {
     return (
@@ -32,8 +36,7 @@ export function Editor() {
           value={active.content}
           height="100%"
           style={{ height: '100%' }}
-          theme={oneDark}
-          extensions={[editorTheme, ...languageForPath(active.path)]}
+          extensions={[editorTheme, themeExt, ...languageForPath(active.path)]}
           onChange={setActiveContent}
           basicSetup={{
             lineNumbers: true,
