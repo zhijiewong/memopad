@@ -75,6 +75,16 @@ fn journal_file(journals_dir: &std::path::Path, buffer_id: &str) -> std::path::P
     journals_dir.join(format!("{}.jsonl", buffer_id))
 }
 
+/// Delete the journal file for a buffer. Missing file is not an error.
+pub fn clear_at(journals_dir: &std::path::Path, buffer_id: &str) -> std::io::Result<()> {
+    let path = journal_file(journals_dir, buffer_id);
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
 /// Scan `journals_dir` for `*.jsonl` files. For each, return the most recent
 /// (last) snapshot together with its buffer id.
 pub fn replay_at(journals_dir: &std::path::Path) -> std::io::Result<Vec<RestoredEntry>> {
@@ -312,5 +322,55 @@ mod replay_tests {
         let entries = replay_at(&dir).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].buffer_id, "good");
+    }
+}
+
+#[cfg(test)]
+mod clear_tests {
+    use super::*;
+
+    fn tmp() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "memopad_journal_clear_{}_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+            std::process::id(),
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn snap() -> Snapshot {
+        Snapshot {
+            path: Some("/x.txt".to_string()),
+            content: "x".to_string(),
+            encoding: "utf-8".to_string(),
+            eol: "lf".to_string(),
+        }
+    }
+
+    #[test]
+    fn clears_existing_journal() {
+        let dir = tmp();
+        snapshot_at(&dir, "buf", &snap()).unwrap();
+        assert!(journal_file(&dir, "buf").exists());
+        clear_at(&dir, "buf").unwrap();
+        assert!(!journal_file(&dir, "buf").exists());
+    }
+
+    #[test]
+    fn missing_journal_is_not_an_error() {
+        let dir = tmp();
+        clear_at(&dir, "ghost").unwrap();
+    }
+
+    #[test]
+    fn clear_one_does_not_touch_others() {
+        let dir = tmp();
+        snapshot_at(&dir, "keep", &snap()).unwrap();
+        snapshot_at(&dir, "drop", &snap()).unwrap();
+        clear_at(&dir, "drop").unwrap();
+        assert!(journal_file(&dir, "keep").exists());
+        assert!(!journal_file(&dir, "drop").exists());
     }
 }
