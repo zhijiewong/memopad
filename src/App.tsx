@@ -73,8 +73,8 @@ export default function App() {
       persistSession().catch(() => {});
       recordStatsForBuffersWithoutOne().catch(() => {});
     });
-    const unlistenCloseP = getCurrentWindow().onCloseRequested(async () => {
-      await persistSession();
+    const unlistenCloseP = getCurrentWindow().onCloseRequested(() => {
+      persistSession().catch(() => {});
     });
     const unlistenFocusP = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
       if (focused) rescanExternalChanges().catch(() => {});
