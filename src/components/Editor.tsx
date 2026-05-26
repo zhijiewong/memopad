@@ -1,7 +1,7 @@
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView } from '@codemirror/view';
-import { useBuffer } from '../stores/buffer';
+import { useBuffers, selectActive } from '../stores/buffers';
 import { languageForPath } from '../lib/language';
 
 const editorTheme = EditorView.theme({
@@ -11,17 +11,25 @@ const editorTheme = EditorView.theme({
 });
 
 export function Editor() {
-  const content = useBuffer((s) => s.content);
-  const path = useBuffer((s) => s.path);
-  const setContent = useBuffer((s) => s.setContent);
+  const active = useBuffers(selectActive);
+  const setActiveContent = useBuffers((s) => s.setActiveContent);
+
+  if (!active) {
+    return (
+      <div className="flex h-full items-center justify-center text-xs text-neutral-500">
+        Ctrl+O to open · Ctrl+N to start typing
+      </div>
+    );
+  }
 
   return (
     <CodeMirror
-      value={content}
+      key={active.id}
+      value={active.content}
       height="100%"
       theme={oneDark}
-      extensions={[editorTheme, ...languageForPath(path)]}
-      onChange={setContent}
+      extensions={[editorTheme, ...languageForPath(active.path)]}
+      onChange={setActiveContent}
       basicSetup={{
         lineNumbers: true,
         foldGutter: false,

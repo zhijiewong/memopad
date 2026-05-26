@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { OpenedFile, Encoding, LineEnding } from '../stores/buffer';
+import type { OpenedFile, Encoding, LineEnding } from '../stores/buffers';
 
 function asError(e: unknown): Error {
   return e instanceof Error ? e : new Error(typeof e === 'string' ? e : JSON.stringify(e));
