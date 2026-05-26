@@ -24,10 +24,14 @@ export function TitleBar() {
   }, []);
 
   return (
-    <div className="drag-region flex h-9 select-none items-center justify-between border-b border-neutral-800 bg-neutral-900 text-neutral-300">
+    <div
+      className="drag-region flex h-9 select-none items-center justify-between border-b"
+      style={{ background: 'var(--app-bg)', borderColor: 'var(--app-border)', color: 'var(--app-fg-muted)' }}
+    >
       <button
         type="button"
-        className="no-drag flex h-full w-9 items-center justify-center text-base hover:bg-neutral-800"
+        className="no-drag flex h-full w-9 items-center justify-center text-base"
+        style={{ color: 'var(--app-fg-muted)' }}
         aria-label="App menu"
       >
         ≡
@@ -41,7 +45,7 @@ export function TitleBar() {
         <button
           type="button"
           aria-label="Minimize"
-          className="flex h-full w-11 items-center justify-center hover:bg-neutral-800"
+          className="flex h-full w-11 items-center justify-center hover:opacity-70"
           onClick={() => invoke('window_minimize').catch(console.error)}
         >
           &#x2013;
@@ -49,7 +53,7 @@ export function TitleBar() {
         <button
           type="button"
           aria-label={maximized ? 'Restore' : 'Maximize'}
-          className="flex h-full w-11 items-center justify-center hover:bg-neutral-800"
+          className="flex h-full w-11 items-center justify-center hover:opacity-70"
           onClick={() => invoke('window_toggle_maximize').catch(console.error)}
         >
           {maximized ? '❐' : '☐'}
@@ -57,7 +61,9 @@ export function TitleBar() {
         <button
           type="button"
           aria-label="Close"
-          className="flex h-full w-11 items-center justify-center hover:bg-red-600 hover:text-white"
+          className="flex h-full w-11 items-center justify-center hover:text-white"
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--app-danger)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = '')}
           onClick={() => invoke('window_close').catch(console.error)}
         >
           &times;

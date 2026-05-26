@@ -6,6 +6,7 @@ import { StatusBar } from './components/StatusBar';
 import { useCommands } from './commands/registry';
 import { registerBuiltins } from './commands/builtins';
 import { useBuffers } from './stores/buffers';
+import { useTheme, effectiveTheme } from './stores/theme';
 import { startJournalDebounce } from './lib/journal-debounce';
 import { bootRestore } from './lib/boot';
 import { sessionSave, statFile } from './lib/tauri';
@@ -62,6 +63,13 @@ async function rescanExternalChanges() {
 
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const themeMode = useTheme((s) => s.mode);
+  useEffect(() => {
+    const cls = effectiveTheme(themeMode) === 'dark' ? 'theme-dark' : 'theme-light';
+    document.documentElement.classList.remove('theme-dark', 'theme-light');
+    document.documentElement.classList.add(cls);
+  }, [themeMode]);
 
   useEffect(() => {
     bootRestore()

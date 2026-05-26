@@ -1,0 +1,29 @@
+/* Warm-neutral palettes — Memopad Dark / Memopad Light. */
+
+:root.theme-dark {
+  --app-bg: #1a1a1c;
+  --app-bg-elevated: #232325;
+  --app-border: #2e2e30;
+  --app-fg: #e8e6e3;
+  --app-fg-muted: #a09e9b;
+  --app-fg-dim: #6b6966;
+  --app-accent: #f3c969;
+  --app-accent-text: #1a1a1c;
+  --app-danger: #d97a6c;
+  --app-tab-active-bg: #131315;
+  --app-tab-hover-bg: rgba(255, 255, 255, 0.04);
+}
+
+:root.theme-light {
+  --app-bg: #faf8f4;
+  --app-bg-elevated: #f1ede4;
+  --app-border: #d9d2c2;
+  --app-fg: #2b2926;
+  --app-fg-muted: #6b6966;
+  --app-fg-dim: #a09e9b;
+  --app-accent: #b9892e;
+  --app-accent-text: #faf8f4;
+  --app-danger: #b85a4a;
+  --app-tab-active-bg: #ffffff;
+  --app-tab-hover-bg: rgba(0, 0, 0, 0.04);
+}
