@@ -155,4 +155,47 @@ describe('buffers store', () => {
     expect(s.buffers[0].dirty).to.equal(false);
     expect(s.buffers[0].content).to.equal('hello');
   });
+
+  it('openRestored creates a buffer with the supplied id (preserves journal correlation)', () => {
+    const buf = useBuffers.getState().openRestored({
+      bufferId: 'preserved-id',
+      path: '/tmp/x.txt',
+      content: 'restored body',
+      encoding: 'utf-8',
+      eol: 'lf',
+      dirty: true,
+    });
+    expect(buf).to.equal('preserved-id');
+    const s = useBuffers.getState();
+    expect(s.buffers).to.have.length(1);
+    expect(s.buffers[0].id).to.equal('preserved-id');
+    expect(s.buffers[0].dirty).to.equal(true);
+    expect(s.buffers[0].content).to.equal('restored body');
+  });
+
+  it('recordStat stores the mtime+size for the named buffer', () => {
+    const a = useBuffers.getState().openBuffer({
+      path: '/tmp/r.txt',
+      content: 'r',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    useBuffers.getState().recordStat(a, { mtime_ms: 1700000000000, size: 42 });
+    const s = useBuffers.getState();
+    expect(s.buffers[0].recordedStat).to.deep.equal({ mtime_ms: 1700000000000, size: 42 });
+    expect(s.buffers[0].externalChange).to.equal(false);
+  });
+
+  it('setExternalChange flags the buffer (used by focus-time detection)', () => {
+    const a = useBuffers.getState().openBuffer({
+      path: '/tmp/e.txt',
+      content: 'e',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    useBuffers.getState().setExternalChange(a, true);
+    expect(useBuffers.getState().buffers[0].externalChange).to.equal(true);
+    useBuffers.getState().setExternalChange(a, false);
+    expect(useBuffers.getState().buffers[0].externalChange).to.equal(false);
+  });
 });
