@@ -85,26 +85,33 @@ export function md5(bytes: Buffer): string {
   return crypto.createHash('md5').update(bytes).digest('hex');
 }
 
-/** Read the title bar's centered text — used to assert which file is open + dirty state. */
+/** Read the active tab's text — used to assert which file is open + dirty state. */
 export async function readTitleBarText(): Promise<{ name: string; dirty: boolean }> {
   // Use classicExecute() (raw HTTP /execute/sync) instead of browser.execute(),
   // because WebdriverIO v9 routes execute() through WebDriver BiDi which targets
   // a stale "about:blank" context in the wry/msedgedriver integration.
-  let text = '';
+  let name = '';
+  let dirty = false;
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
-    text = await classicExecute<string>(
-      `var r = document.querySelector('.drag-region .pointer-events-none');
-       return r ? r.textContent : '';`,
+    const result = await classicExecute<{ name: string; dirty: boolean } | null>(
+      `var tab = document.querySelector('[role="tab"][aria-selected="true"]');
+       if (!tab) return null;
+       var nameSpan = tab.querySelector('span.truncate');
+       if (!nameSpan) return null;
+       var dirtySpan = tab.querySelector('span[aria-label="Unsaved changes"]');
+       return { name: nameSpan.textContent || '', dirty: !!dirtySpan };`,
     );
-    if (text && text.trim().length > 0) break;
+    if (result && result.name.trim().length > 0) {
+      name = result.name.trim();
+      dirty = result.dirty;
+      break;
+    }
     await new Promise<void>((r) => setTimeout(r, 500));
   }
-  if (!text || !text.trim()) {
+  if (!name) {
     throw new Error('Title bar text did not appear within 10 s');
   }
-  const name = text.replace(/●/g, '').trim();
-  const dirty = text.includes('●');
   return { name, dirty };
 }
 
@@ -137,10 +144,14 @@ export async function getEditorContent(): Promise<string> {
 export async function resetBuffer(): Promise<void> {
   const browser = getBrowser();
   await browser.execute(() => {
-    const win = window as unknown as { __memopadTestReset?: () => void };
-    if (!win.__memopadTestReset) {
-      throw new Error('Test hook __memopadTestReset missing.');
+    const win = window as unknown as {
+      __memopadTestReset?: () => void;
+      __memopadTestNewBuffer?: () => string;
+    };
+    if (!win.__memopadTestReset || !win.__memopadTestNewBuffer) {
+      throw new Error('Test hooks missing.');
     }
     win.__memopadTestReset();
+    win.__memopadTestNewBuffer();
   });
 }
