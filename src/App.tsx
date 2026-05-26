@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { Editor } from './components/Editor';
 import { CommandPalette } from './components/CommandPalette';
+import { StatusBar } from './components/StatusBar';
 import { useCommands } from './commands/registry';
 import { registerBuiltins } from './commands/builtins';
 
@@ -58,6 +59,7 @@ export default function App() {
       <main className="flex flex-1 overflow-hidden">
         <Editor />
       </main>
+      <StatusBar />
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} onRun={runCommand} />}
     </div>
   );
