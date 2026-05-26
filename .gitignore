@@ -7,3 +7,5 @@ src-tauri/gen/
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+.superpowers/
+tests/e2e/*.png
