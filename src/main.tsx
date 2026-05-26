@@ -4,8 +4,6 @@ import App from './App';
 import './index.css';
 import { useBuffers, selectActive } from './stores/buffers';
 
-// E2E test hooks. Read-only or trivial write-only shims so WebDriver tests can
-// drive the store without going through CodeMirror keystroke timing.
 const w = window as unknown as {
   __memopadTestSetContent?: (s: string) => void;
   __memopadTestGetContent?: () => string;
@@ -20,6 +18,10 @@ const w = window as unknown as {
   __memopadTestSwitchTo?: (id: string) => void;
   __memopadTestActiveId?: () => string | null;
   __memopadTestTabIds?: () => string[];
+  __memopadTestSetExternalChange?: (id: string, flag: boolean) => void;
+  __memopadTestRecordStat?: (id: string, stat: { mtime_ms: number; size: number }) => void;
+  __memopadTestActiveDirty?: () => boolean;
+  __memopadTestExternalChange?: () => boolean;
 };
 
 w.__memopadTestSetContent = (s) => useBuffers.getState().setActiveContent(s);
@@ -31,6 +33,13 @@ w.__memopadTestCloseBuffer = (id) => useBuffers.getState().closeBuffer(id);
 w.__memopadTestSwitchTo = (id) => useBuffers.getState().switchTo(id);
 w.__memopadTestActiveId = () => useBuffers.getState().activeId;
 w.__memopadTestTabIds = () => useBuffers.getState().buffers.map((b) => b.id);
+w.__memopadTestSetExternalChange = (id, flag) =>
+  useBuffers.getState().setExternalChange(id, flag);
+w.__memopadTestRecordStat = (id, stat) =>
+  useBuffers.getState().recordStat(id, stat);
+w.__memopadTestActiveDirty = () => selectActive(useBuffers.getState())?.dirty ?? false;
+w.__memopadTestExternalChange = () =>
+  selectActive(useBuffers.getState())?.externalChange ?? false;
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

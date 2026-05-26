@@ -155,4 +155,72 @@ describe('buffers store', () => {
     expect(s.buffers[0].dirty).to.equal(false);
     expect(s.buffers[0].content).to.equal('hello');
   });
+
+  it('openRestored creates a buffer with the supplied id (preserves journal correlation)', () => {
+    const buf = useBuffers.getState().openRestored({
+      bufferId: 'preserved-id',
+      path: '/tmp/x.txt',
+      content: 'restored body',
+      encoding: 'utf-8',
+      eol: 'lf',
+      dirty: true,
+    });
+    expect(buf).to.equal('preserved-id');
+    const s = useBuffers.getState();
+    expect(s.buffers).to.have.length(1);
+    expect(s.buffers[0].id).to.equal('preserved-id');
+    expect(s.buffers[0].dirty).to.equal(true);
+    expect(s.buffers[0].content).to.equal('restored body');
+  });
+
+  it('recordStat stores the mtime+size for the named buffer', () => {
+    const a = useBuffers.getState().openBuffer({
+      path: '/tmp/r.txt',
+      content: 'r',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    useBuffers.getState().recordStat(a, { mtime_ms: 1700000000000, size: 42 });
+    const s = useBuffers.getState();
+    expect(s.buffers[0].recordedStat).to.deep.equal({ mtime_ms: 1700000000000, size: 42 });
+    expect(s.buffers[0].externalChange).to.equal(false);
+  });
+
+  it('setExternalChange flags the buffer (used by focus-time detection)', () => {
+    const a = useBuffers.getState().openBuffer({
+      path: '/tmp/e.txt',
+      content: 'e',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    useBuffers.getState().setExternalChange(a, true);
+    expect(useBuffers.getState().buffers[0].externalChange).to.equal(true);
+    useBuffers.getState().setExternalChange(a, false);
+    expect(useBuffers.getState().buffers[0].externalChange).to.equal(false);
+  });
+
+  it('replaceBuffer updates content+path on the existing buffer (single occurrence preserved)', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: '/tmp/x.txt',
+      content: 'original',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    useBuffers.getState().setActiveContent('dirty edits');
+    useBuffers.getState().replaceBuffer(id, {
+      path: '/tmp/x.txt',
+      content: 'fresh from disk',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    const s = useBuffers.getState();
+    // Exactly one buffer with this id remains.
+    expect(s.buffers.filter((b) => b.id === id)).to.have.length(1);
+    const b = s.buffers.find((x) => x.id === id)!;
+    expect(b.content).to.equal('fresh from disk');
+    expect(b.originalContent).to.equal('fresh from disk');
+    expect(b.dirty).to.equal(false);
+    expect(b.externalChange).to.equal(false);
+    expect(s.activeId).to.equal(id);
+  });
 });

@@ -10,6 +10,11 @@ export interface OpenedFile {
   eol: LineEnding;
 }
 
+export interface FileStatSnapshot {
+  mtime_ms: number;
+  size: number;
+}
+
 export interface Buffer {
   id: string;
   path: string | null;
@@ -18,6 +23,24 @@ export interface Buffer {
   encoding: Encoding;
   eol: LineEnding;
   dirty: boolean;
+  recordedStat: FileStatSnapshot | null;
+  externalChange: boolean;
+}
+
+export interface RestoredBufferInput {
+  bufferId: string;
+  path: string | null;
+  content: string;
+  encoding: Encoding;
+  eol: LineEnding;
+  dirty: boolean;
+}
+
+export interface ReplaceBufferInput {
+  path: string | null;
+  content: string;
+  encoding: Encoding;
+  eol: LineEnding;
 }
 
 interface BuffersState {
@@ -27,6 +50,7 @@ interface BuffersState {
 
   newBuffer: () => string;
   openBuffer: (file: OpenedFile) => string;
+  openRestored: (input: RestoredBufferInput) => string;
   closeBuffer: (id: string) => void;
   switchTo: (id: string) => void;
   setActiveContent: (next: string) => void;
@@ -35,6 +59,9 @@ interface BuffersState {
   setActiveEol: (eol: LineEnding) => void;
   reorderBuffer: (id: string, toIndex: number) => void;
   reopenLastClosed: () => string | null;
+  recordStat: (id: string, stat: FileStatSnapshot) => void;
+  setExternalChange: (id: string, flag: boolean) => void;
+  replaceBuffer: (id: string, next: ReplaceBufferInput) => void;
   resetAll: () => void;
 }
 
@@ -53,6 +80,8 @@ function emptyBuffer(): Buffer {
     encoding: 'utf-8',
     eol: 'lf',
     dirty: false,
+    recordedStat: null,
+    externalChange: false,
   };
 }
 
@@ -81,6 +110,24 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       encoding: file.encoding,
       eol: file.eol,
       dirty: false,
+      recordedStat: null,
+      externalChange: false,
+    };
+    set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
+    return buf.id;
+  },
+
+  openRestored: (input) => {
+    const buf: Buffer = {
+      id: input.bufferId,
+      path: input.path,
+      content: input.content,
+      originalContent: input.dirty ? '' : input.content,
+      encoding: input.encoding,
+      eol: input.eol,
+      dirty: input.dirty,
+      recordedStat: null,
+      externalChange: false,
     };
     set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
     return buf.id;
@@ -123,7 +170,9 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   markSaved: (id, newPath) => {
     set((s) => ({
       buffers: s.buffers.map((b) =>
-        b.id === id ? { ...b, path: newPath, originalContent: b.content, dirty: false } : b,
+        b.id === id
+          ? { ...b, path: newPath, originalContent: b.content, dirty: false, externalChange: false }
+          : b,
       ),
     }));
   },
@@ -173,6 +222,37 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       recentlyClosed: rest,
     }));
     return restored.id;
+  },
+
+  recordStat: (id, stat) => {
+    set((s) => ({
+      buffers: s.buffers.map((b) => (b.id === id ? { ...b, recordedStat: stat } : b)),
+    }));
+  },
+
+  setExternalChange: (id, flag) => {
+    set((s) => ({
+      buffers: s.buffers.map((b) => (b.id === id ? { ...b, externalChange: flag } : b)),
+    }));
+  },
+
+  replaceBuffer: (id, next) => {
+    set((s) => ({
+      buffers: s.buffers.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              path: next.path,
+              content: next.content,
+              originalContent: next.content,
+              encoding: next.encoding,
+              eol: next.eol,
+              dirty: false,
+              externalChange: false,
+            }
+          : b,
+      ),
+    }));
   },
 
   resetAll: () => {

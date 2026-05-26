@@ -33,3 +33,81 @@ export async function revealInExplorer(filePath: string): Promise<void> {
     throw asError(e);
   }
 }
+
+export interface JournalSnapshot {
+  path: string | null;
+  content: string;
+  encoding: Encoding;
+  eol: LineEnding;
+}
+
+export interface RestoredEntry {
+  buffer_id: string;
+  snapshot: JournalSnapshot;
+}
+
+export interface TabEntry {
+  buffer_id: string;
+  path: string | null;
+}
+
+export interface SessionState {
+  tabs: TabEntry[];
+  active_id: string | null;
+}
+
+export interface FileStat {
+  mtime_ms: number;
+  size: number;
+}
+
+export async function journalSnapshot(
+  bufferId: string,
+  snapshot: JournalSnapshot,
+): Promise<void> {
+  try {
+    await invoke<void>('journal_snapshot', { bufferId, snapshot });
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function journalReplay(): Promise<RestoredEntry[]> {
+  try {
+    return await invoke<RestoredEntry[]>('journal_replay');
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function journalClear(bufferId: string): Promise<void> {
+  try {
+    await invoke<void>('journal_clear', { bufferId });
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function sessionSave(state: SessionState): Promise<void> {
+  try {
+    await invoke<void>('session_save', { state });
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function sessionLoad(): Promise<SessionState> {
+  try {
+    return await invoke<SessionState>('session_load');
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function statFile(path: string): Promise<FileStat> {
+  try {
+    return await invoke<FileStat>('stat_file', { path });
+  } catch (e) {
+    throw asError(e);
+  }
+}
