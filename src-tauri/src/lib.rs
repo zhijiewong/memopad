@@ -1,6 +1,7 @@
 mod fs;
 mod journal;
 mod session;
+mod stat;
 
 use std::process::Command;
 
