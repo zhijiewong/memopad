@@ -198,4 +198,29 @@ describe('buffers store', () => {
     useBuffers.getState().setExternalChange(a, false);
     expect(useBuffers.getState().buffers[0].externalChange).to.equal(false);
   });
+
+  it('replaceBuffer updates content+path on the existing buffer (single occurrence preserved)', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: '/tmp/x.txt',
+      content: 'original',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    useBuffers.getState().setActiveContent('dirty edits');
+    useBuffers.getState().replaceBuffer(id, {
+      path: '/tmp/x.txt',
+      content: 'fresh from disk',
+      encoding: 'utf-8',
+      eol: 'lf',
+    });
+    const s = useBuffers.getState();
+    // Exactly one buffer with this id remains.
+    expect(s.buffers.filter((b) => b.id === id)).to.have.length(1);
+    const b = s.buffers.find((x) => x.id === id)!;
+    expect(b.content).to.equal('fresh from disk');
+    expect(b.originalContent).to.equal('fresh from disk');
+    expect(b.dirty).to.equal(false);
+    expect(b.externalChange).to.equal(false);
+    expect(s.activeId).to.equal(id);
+  });
 });

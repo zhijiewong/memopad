@@ -9,22 +9,15 @@ export function ExternalChangeBanner() {
     try {
       const opened = await openFile(active.path!);
       const stat = await statFile(active.path!).catch(() => null);
-      // Replace the buffer's content while keeping the same id.
-      useBuffers.getState().openRestored({
-        bufferId: active.id,
+      useBuffers.getState().replaceBuffer(active.id, {
         path: opened.path,
         content: opened.content,
         encoding: opened.encoding,
         eol: opened.eol,
-        dirty: false,
       });
-      // openRestored appended a SECOND buffer with the same id; remove the original.
-      // closeBuffer matches by id and removes the FIRST match (which is the stale one we want gone).
-      useBuffers.getState().closeBuffer(active.id);
       if (stat) {
         useBuffers.getState().recordStat(active.id, stat);
       }
-      useBuffers.getState().setExternalChange(active.id, false);
     } catch (err) {
       console.error('reload failed:', err);
     }

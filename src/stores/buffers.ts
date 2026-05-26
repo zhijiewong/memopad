@@ -36,6 +36,13 @@ export interface RestoredBufferInput {
   dirty: boolean;
 }
 
+export interface ReplaceBufferInput {
+  path: string | null;
+  content: string;
+  encoding: Encoding;
+  eol: LineEnding;
+}
+
 interface BuffersState {
   buffers: Buffer[];
   activeId: string | null;
@@ -54,6 +61,7 @@ interface BuffersState {
   reopenLastClosed: () => string | null;
   recordStat: (id: string, stat: FileStatSnapshot) => void;
   setExternalChange: (id: string, flag: boolean) => void;
+  replaceBuffer: (id: string, next: ReplaceBufferInput) => void;
   resetAll: () => void;
 }
 
@@ -225,6 +233,25 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   setExternalChange: (id, flag) => {
     set((s) => ({
       buffers: s.buffers.map((b) => (b.id === id ? { ...b, externalChange: flag } : b)),
+    }));
+  },
+
+  replaceBuffer: (id, next) => {
+    set((s) => ({
+      buffers: s.buffers.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              path: next.path,
+              content: next.content,
+              originalContent: next.content,
+              encoding: next.encoding,
+              eol: next.eol,
+              dirty: false,
+              externalChange: false,
+            }
+          : b,
+      ),
     }));
   },
 
