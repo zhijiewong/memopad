@@ -25,3 +25,11 @@ export async function saveFile(
     throw asError(e);
   }
 }
+
+export async function revealInExplorer(filePath: string): Promise<void> {
+  try {
+    await invoke<void>('reveal_in_explorer', { path: filePath });
+  } catch (e) {
+    throw asError(e);
+  }
+}
