@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TitleBar } from './components/TitleBar';
+import { UpdateBanner } from './components/UpdateBanner';
 import { Editor } from './components/Editor';
 import { CommandPalette } from './components/CommandPalette';
 import { StatusBar } from './components/StatusBar';
@@ -134,6 +135,7 @@ export default function App() {
   return (
     <div className="flex h-full flex-col bg-neutral-900">
       <TitleBar />
+      <UpdateBanner />
       <main className="flex flex-1 overflow-hidden">
         <Editor />
       </main>
