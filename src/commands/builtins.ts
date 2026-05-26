@@ -117,4 +117,17 @@ export function registerBuiltins() {
     title: 'View: Use System Theme',
     run: () => useTheme.getState().set('system'),
   });
+
+  register({
+    id: 'edit.find',
+    title: 'Edit: Find',
+    shortcut: 'Ctrl+F',
+    run: () => globalThis.__memopadSearchPanel?.open('find'),
+  });
+  register({
+    id: 'edit.replace',
+    title: 'Edit: Replace',
+    shortcut: 'Ctrl+H',
+    run: () => globalThis.__memopadSearchPanel?.open('replace'),
+  });
 }

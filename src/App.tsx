@@ -105,6 +105,16 @@ export default function App() {
       if (!mod) return;
       const key = e.key.toLowerCase();
 
+      if (key === 'f' && !e.shiftKey) {
+        e.preventDefault();
+        globalThis.__memopadSearchPanel?.open('find');
+        return;
+      }
+      if (key === 'h' && !e.shiftKey) {
+        e.preventDefault();
+        globalThis.__memopadSearchPanel?.open('replace');
+        return;
+      }
       if (key === 'k' && !e.shiftKey) { e.preventDefault(); setPaletteOpen(true); return; }
       if (key === 'p' && e.shiftKey)  { e.preventDefault(); setPaletteOpen(true); return; }
       if (key === 'o' && !e.shiftKey) { e.preventDefault(); runCommand('file.open'); return; }
