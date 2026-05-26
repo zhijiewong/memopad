@@ -25,6 +25,8 @@ export interface Buffer {
   dirty: boolean;
   recordedStat: FileStatSnapshot | null;
   externalChange: boolean;
+  cursor: number | null;
+  scrollTop: number | null;
 }
 
 export interface RestoredBufferInput {
@@ -61,6 +63,8 @@ interface BuffersState {
   reopenLastClosed: () => string | null;
   recordStat: (id: string, stat: FileStatSnapshot) => void;
   setExternalChange: (id: string, flag: boolean) => void;
+  setCursor: (id: string, cursor: number | null) => void;
+  setScrollTop: (id: string, scrollTop: number | null) => void;
   replaceBuffer: (id: string, next: ReplaceBufferInput) => void;
   resetAll: () => void;
 }
@@ -82,6 +86,8 @@ function emptyBuffer(): Buffer {
     dirty: false,
     recordedStat: null,
     externalChange: false,
+    cursor: null,
+    scrollTop: null,
   };
 }
 
@@ -112,6 +118,8 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       dirty: false,
       recordedStat: null,
       externalChange: false,
+      cursor: null,
+      scrollTop: null,
     };
     set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
     return buf.id;
@@ -128,6 +136,8 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       dirty: input.dirty,
       recordedStat: null,
       externalChange: false,
+      cursor: null,
+      scrollTop: null,
     };
     set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
     return buf.id;
@@ -236,6 +246,18 @@ export const useBuffers = create<BuffersState>((set, get) => ({
     }));
   },
 
+  setCursor: (id, cursor) => {
+    set((s) => ({
+      buffers: s.buffers.map((b) => (b.id === id ? { ...b, cursor } : b)),
+    }));
+  },
+
+  setScrollTop: (id, scrollTop) => {
+    set((s) => ({
+      buffers: s.buffers.map((b) => (b.id === id ? { ...b, scrollTop } : b)),
+    }));
+  },
+
   replaceBuffer: (id, next) => {
     set((s) => ({
       buffers: s.buffers.map((b) =>
@@ -249,6 +271,8 @@ export const useBuffers = create<BuffersState>((set, get) => ({
               eol: next.eol,
               dirty: false,
               externalChange: false,
+              cursor: null,
+              scrollTop: null,
             }
           : b,
       ),
