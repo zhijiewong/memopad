@@ -23,7 +23,12 @@ fn window_toggle_maximize(window: tauri::Window) -> Result<(), String> {
 
 #[tauri::command]
 fn window_close(window: tauri::Window) -> Result<(), String> {
-    window.close().map_err(|e| e.to_string())
+    // Use destroy(), not close(): close() emits a CloseRequested JS event,
+    // which (with our subscription model) caused the window to remain open
+    // on Windows/WebView2. The store subscription has already persisted
+    // session.json on every state change, so we don't need to drain
+    // anything before tearing down the window.
+    window.destroy().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

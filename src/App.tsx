@@ -73,9 +73,12 @@ export default function App() {
       persistSession().catch(() => {});
       recordStatsForBuffersWithoutOne().catch(() => {});
     });
-    const unlistenCloseP = getCurrentWindow().onCloseRequested(() => {
-      persistSession().catch(() => {});
-    });
+    // No onCloseRequested handler: the store subscription above already
+    // persists session.json on every relevant state change, so by the time
+    // the user clicks X the file is up to date. Registering a handler at
+    // all interferes with the close path in Tauri 2 / WebView2 — the
+    // window stays open until the handler is explicitly resolved. We use
+    // window.destroy() on the Rust side to make X reliably close the app.
     const unlistenFocusP = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
       if (focused) rescanExternalChanges().catch(() => {});
     });
@@ -83,7 +86,6 @@ export default function App() {
     return () => {
       stopJournal();
       stopSessionWatcher();
-      unlistenCloseP.then((un) => un()).catch(() => {});
       unlistenFocusP.then((un) => un()).catch(() => {});
     };
   }, []);
