@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { OpenedFile, Encoding, LineEnding } from '../stores/buffer';
+import type { OpenedFile, Encoding, LineEnding } from '../stores/buffers';
 
 function asError(e: unknown): Error {
   return e instanceof Error ? e : new Error(typeof e === 'string' ? e : JSON.stringify(e));
@@ -21,6 +21,14 @@ export async function saveFile(
 ): Promise<void> {
   try {
     await invoke<void>('save_file', { path, content, encoding, eol });
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function revealInExplorer(filePath: string): Promise<void> {
+  try {
+    await invoke<void>('reveal_in_explorer', { path: filePath });
   } catch (e) {
     throw asError(e);
   }

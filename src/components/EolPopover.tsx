@@ -1,0 +1,48 @@
+import { useEffect, useRef } from 'react';
+import type { LineEnding } from '../stores/buffers';
+
+const OPTIONS: { value: LineEnding; label: string }[] = [
+  { value: 'lf', label: 'LF' },
+  { value: 'crlf', label: 'CRLF' },
+  { value: 'cr', label: 'CR' },
+];
+
+interface Props {
+  current: LineEnding;
+  anchorRect: DOMRect;
+  onSelect: (next: LineEnding) => void;
+  onClose: () => void;
+}
+
+export function EolPopover({ current, anchorRect, onSelect, onClose }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      role="menu"
+      style={{ left: anchorRect.left, bottom: window.innerHeight - anchorRect.top + 4 }}
+      className="fixed z-50 min-w-[100px] rounded border border-neutral-700 bg-neutral-900 py-1 text-xs text-neutral-200 shadow-lg"
+    >
+      {OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => { onSelect(opt.value); onClose(); }}
+          className={
+            'block w-full px-3 py-1.5 text-left hover:bg-neutral-800 '
+            + (opt.value === current ? 'text-amber-400' : '')
+          }
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}

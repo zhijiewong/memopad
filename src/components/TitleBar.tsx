@@ -1,18 +1,10 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useBuffer } from '../stores/buffer';
-
-function fileNameOf(path: string | null): string {
-  if (!path) return 'Untitled';
-  const parts = path.replace(/\\/g, '/').split('/');
-  return parts[parts.length - 1] || path;
-}
+import { TabStrip } from './TabStrip';
 
 export function TitleBar() {
   const [maximized, setMaximized] = useState(false);
-  const path = useBuffer((s) => s.path);
-  const dirty = useBuffer((s) => s.dirty);
 
   useEffect(() => {
     let mounted = true;
@@ -41,9 +33,8 @@ export function TitleBar() {
         ≡
       </button>
 
-      <div className="pointer-events-none flex flex-1 items-center justify-center gap-2 text-xs tracking-wide text-neutral-400">
-        <span>{fileNameOf(path)}</span>
-        {dirty && <span aria-label="Unsaved changes" className="text-amber-400">●</span>}
+      <div className="no-drag flex-1 overflow-hidden">
+        <TabStrip />
       </div>
 
       <div className="no-drag flex h-full">
