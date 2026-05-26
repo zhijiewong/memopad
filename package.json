@@ -25,6 +25,7 @@
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@uiw/react-codemirror": "^4.25.10",
+    "diff": "^5.2.2",
     "fuzzysort": "^3.1.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.2",
     "@types/chai": "^4.3.20",
+    "@types/diff": "^5.2.3",
     "@types/mocha": "^10.0.10",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
