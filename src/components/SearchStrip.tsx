@@ -22,11 +22,15 @@ interface Props {
   mode: 'find' | 'replace';
   onClose: () => void;
   actions: SearchStripActions | null;
+  /** Controlled find query text (lifted to parent for test hooks). */
+  query: string;
+  onQueryChange: (q: string) => void;
+  /** Controlled replace text (lifted to parent for test hooks). */
+  replaceText: string;
+  onReplaceChange: (r: string) => void;
 }
 
-export function SearchStrip({ open, mode, onClose, actions }: Props) {
-  const [query, setQuery] = useState('');
-  const [replace, setReplace] = useState('');
+export function SearchStrip({ open, mode, onClose, actions, query, onQueryChange, replaceText, onReplaceChange }: Props) {
   const [regex, setRegex] = useState(false);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [matches, setMatches] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
@@ -34,9 +38,9 @@ export function SearchStrip({ open, mode, onClose, actions }: Props) {
 
   useEffect(() => {
     if (!actions || !open) return;
-    actions.setQuery(query, { regex, caseSensitive, replace });
+    actions.setQuery(query, { regex, caseSensitive, replace: replaceText });
     setMatches(actions.matchInfo());
-  }, [query, replace, regex, caseSensitive, actions, open]);
+  }, [query, replaceText, regex, caseSensitive, actions, open]);
 
   useEffect(() => {
     if (open) findInputRef.current?.focus();
@@ -77,7 +81,7 @@ export function SearchStrip({ open, mode, onClose, actions }: Props) {
         ref={findInputRef}
         data-search-find-input
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={onFindKey}
         placeholder="Find"
         className="flex-1 rounded px-2 py-1 focus:outline-none"
@@ -86,8 +90,8 @@ export function SearchStrip({ open, mode, onClose, actions }: Props) {
       {mode === 'replace' && (
         <input
           data-search-replace-input
-          value={replace}
-          onChange={(e) => setReplace(e.target.value)}
+          value={replaceText}
+          onChange={(e) => onReplaceChange(e.target.value)}
           onKeyDown={onReplaceKey}
           placeholder="Replace"
           className="flex-1 rounded px-2 py-1 focus:outline-none"

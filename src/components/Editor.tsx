@@ -3,12 +3,13 @@ import CodeMirror from '@uiw/react-codemirror';
 import { EditorView } from '@codemirror/view';
 import {
   SearchQuery,
-  setSearchQuery,
+  setSearchQuery as cmSetSearchQuery,
   findNext,
   findPrevious,
   replaceNext,
   replaceAll,
   getSearchQuery,
+  search,
 } from '@codemirror/search';
 import { useBuffers, selectActive } from '../stores/buffers';
 import { languageForPath } from '../lib/language';
@@ -31,7 +32,22 @@ interface SearchPanelState {
 
 declare global {
   // eslint-disable-next-line no-var
-  var __memopadSearchPanel: { open: (mode: 'find' | 'replace') => void } | undefined;
+  var __memopadSearchPanel: {
+    open: (mode: 'find' | 'replace') => void;
+    close: () => void;
+    /** Test-only: set the find query text directly (bypasses DOM input). */
+    setFindQuery: (q: string) => void;
+    /** Test-only: set the replace text directly (bypasses DOM input). */
+    setReplaceQuery: (q: string) => void;
+    /**
+     * Test-only: directly apply a search query to the CM view (bypasses React
+     * effect scheduling) and return current match count. Useful when React
+     * effect chain timing is unpredictable in the WebDriver context.
+     */
+    applySearch: (find: string, replace: string) => { current: number; total: number };
+    /** Test-only: run replaceAll on the CM view. */
+    runReplaceAll: () => number;
+  } | undefined;
 }
 
 export function Editor() {
@@ -42,10 +58,32 @@ export function Editor() {
 
   const viewRef = useRef<EditorView | null>(null);
   const [searchPanel, setSearchPanel] = useState<SearchPanelState>({ open: false, mode: 'find' });
+  const [searchFindText, setSearchFindText] = useState('');
+  const [searchReplaceText, setSearchReplaceText] = useState('');
 
   useEffect(() => {
     globalThis.__memopadSearchPanel = {
       open: (mode) => setSearchPanel({ open: true, mode }),
+      close: () => setSearchPanel((s) => ({ ...s, open: false })),
+      setFindQuery: (q) => setSearchFindText(q),
+      setReplaceQuery: (q) => setSearchReplaceText(q),
+      applySearch: (find, replace) => {
+        const v = viewRef.current;
+        if (!v) return { current: 0, total: 0 };
+        const sq = new SearchQuery({ search: find, replace, regexp: false, caseSensitive: false });
+        v.dispatch({ effects: cmSetSearchQuery.of(sq) });
+        // Also update React state so the UI shows the correct values
+        setSearchFindText(find);
+        setSearchReplaceText(replace);
+        return computeMatchInfo(v);
+      },
+      runReplaceAll: () => {
+        const v = viewRef.current;
+        if (!v) return 0;
+        const before = countMatches(v);
+        replaceAll(v);
+        return before;
+      },
     };
     return () => {
       globalThis.__memopadSearchPanel = undefined;
@@ -79,7 +117,7 @@ export function Editor() {
       const v = viewRef.current;
       if (!v) return;
       v.dispatch({
-        effects: setSearchQuery.of(
+        effects: cmSetSearchQuery.of(
           new SearchQuery({
             search: query,
             replace: opts.replace,
@@ -98,7 +136,7 @@ export function Editor() {
       const v = viewRef.current;
       if (!v) return;
       v.dispatch({
-        effects: setSearchQuery.of(new SearchQuery({ search: '' })),
+        effects: cmSetSearchQuery.of(new SearchQuery({ search: '' })),
       });
     },
   };
@@ -123,6 +161,10 @@ export function Editor() {
         mode={searchPanel.mode}
         onClose={closePanel}
         actions={searchPanel.open ? actions : null}
+        query={searchFindText}
+        onQueryChange={setSearchFindText}
+        replaceText={searchReplaceText}
+        onReplaceChange={setSearchReplaceText}
       />
       <div className="min-h-0 flex-1 overflow-hidden">
         <CodeMirror
@@ -133,6 +175,7 @@ export function Editor() {
           extensions={[
             editorTheme,
             themeExt,
+            search(),
             ...languageForPath(active.path),
           ]}
           onChange={setActiveContent}
