@@ -5,6 +5,11 @@ import { CommandPalette } from './components/CommandPalette';
 import { StatusBar } from './components/StatusBar';
 import { useCommands } from './commands/registry';
 import { registerBuiltins } from './commands/builtins';
+import { useBuffers } from './stores/buffers';
+import { startJournalDebounce } from './lib/journal-debounce';
+import { bootRestore } from './lib/boot';
+import { sessionSave } from './lib/tauri';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 registerBuiltins();
 
@@ -15,8 +20,37 @@ function runCommand(id: string) {
   cmd.run();
 }
 
+async function persistSession() {
+  const state = useBuffers.getState();
+  await sessionSave({
+    tabs: state.buffers.map((b) => ({ buffer_id: b.id, path: b.path })),
+    active_id: state.activeId,
+  });
+}
+
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    bootRestore().catch((err) => console.error('boot failed:', err));
+    const stopJournal = startJournalDebounce();
+
+    // Persist session whenever buffers change (debounced via store ticks; cheap JSON write).
+    const stopSessionWatcher = useBuffers.subscribe(() => {
+      persistSession().catch(() => {});
+    });
+
+    // Also persist before the window closes.
+    const unlistenPromise = getCurrentWindow().onCloseRequested(async () => {
+      await persistSession();
+    });
+
+    return () => {
+      stopJournal();
+      stopSessionWatcher();
+      unlistenPromise.then((un) => un()).catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = async (e: KeyboardEvent) => {
@@ -24,25 +58,12 @@ export default function App() {
       if (!mod) return;
       const key = e.key.toLowerCase();
 
-      // Command palette
-      if (key === 'k' && !e.shiftKey) {
-        e.preventDefault();
-        setPaletteOpen(true);
-        return;
-      }
-      if (key === 'p' && e.shiftKey) {
-        e.preventDefault();
-        setPaletteOpen(true);
-        return;
-      }
-
-      // File ops
+      if (key === 'k' && !e.shiftKey) { e.preventDefault(); setPaletteOpen(true); return; }
+      if (key === 'p' && e.shiftKey)  { e.preventDefault(); setPaletteOpen(true); return; }
       if (key === 'o' && !e.shiftKey) { e.preventDefault(); runCommand('file.open'); return; }
       if (key === 's' && !e.shiftKey) { e.preventDefault(); runCommand('file.save'); return; }
       if (key === 's' && e.shiftKey)  { e.preventDefault(); runCommand('file.saveAs'); return; }
       if (key === 'n' && !e.shiftKey) { e.preventDefault(); runCommand('file.new'); return; }
-
-      // Tab ops
       if (key === 'w' && !e.shiftKey) { e.preventDefault(); runCommand('tab.close'); return; }
       if (key === 't' && e.shiftKey)  { e.preventDefault(); runCommand('tab.reopen'); return; }
       if (key === 'tab' && !e.shiftKey) { e.preventDefault(); runCommand('tab.next'); return; }
@@ -65,5 +86,4 @@ export default function App() {
   );
 }
 
-// expose runCommand for the e2e tests (used by palette.spec.ts)
 (window as unknown as { __memopadTestRunCommand?: (id: string) => void }).__memopadTestRunCommand = runCommand;
