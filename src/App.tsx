@@ -9,7 +9,8 @@ import { useBuffers } from './stores/buffers';
 import { useTheme, effectiveTheme } from './stores/theme';
 import { startJournalDebounce } from './lib/journal-debounce';
 import { bootRestore } from './lib/boot';
-import { sessionSave, statFile } from './lib/tauri';
+import { statFile } from './lib/tauri';
+import { scheduleSessionSave } from './lib/session-debounce';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 registerBuiltins();
@@ -21,9 +22,9 @@ function runCommand(id: string) {
   cmd.run();
 }
 
-async function persistSession() {
+function persistSession() {
   const state = useBuffers.getState();
-  await sessionSave({
+  scheduleSessionSave({
     tabs: state.buffers.map((b) => ({ buffer_id: b.id, path: b.path })),
     active_id: state.activeId,
   });
@@ -78,7 +79,7 @@ export default function App() {
 
     const stopJournal = startJournalDebounce();
     const stopSessionWatcher = useBuffers.subscribe(() => {
-      persistSession().catch(() => {});
+      persistSession();
       recordStatsForBuffersWithoutOne().catch(() => {});
     });
     // No onCloseRequested handler: the store subscription above already
