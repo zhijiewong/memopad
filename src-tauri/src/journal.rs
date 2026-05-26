@@ -75,6 +75,42 @@ fn journal_file(journals_dir: &std::path::Path, buffer_id: &str) -> std::path::P
     journals_dir.join(format!("{}.jsonl", buffer_id))
 }
 
+/// Scan `journals_dir` for `*.jsonl` files. For each, return the most recent
+/// (last) snapshot together with its buffer id.
+pub fn replay_at(journals_dir: &std::path::Path) -> std::io::Result<Vec<RestoredEntry>> {
+    let mut out = Vec::new();
+    let read_dir = match std::fs::read_dir(journals_dir) {
+        Ok(r) => r,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(out),
+        Err(e) => return Err(e),
+    };
+    for entry in read_dir {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("jsonl") {
+            continue;
+        }
+        let buffer_id = match path.file_stem().and_then(|s| s.to_str()) {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let last_line = match content.lines().filter(|l| !l.is_empty()).last() {
+            Some(l) => l,
+            None => continue,
+        };
+        let snapshot: Snapshot = match serde_json::from_str(last_line) {
+            Ok(s) => s,
+            Err(_) => continue, // corrupt entry — silently skip
+        };
+        out.push(RestoredEntry { buffer_id, snapshot });
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod snapshot_tests {
     use super::*;
@@ -184,5 +220,97 @@ mod snapshot_tests {
         let content = std::fs::read_to_string(journal_file(&dir, "bufu")).unwrap();
         let parsed: Snapshot = serde_json::from_str(content.lines().next().unwrap()).unwrap();
         assert_eq!(parsed.path, None);
+    }
+}
+
+#[cfg(test)]
+mod replay_tests {
+    use super::*;
+
+    fn tmp() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "memopad_journal_replay_{}_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+            std::process::id(),
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn snap(content: &str, path: Option<&str>) -> Snapshot {
+        Snapshot {
+            path: path.map(|p| p.to_string()),
+            content: content.to_string(),
+            encoding: "utf-8".to_string(),
+            eol: "lf".to_string(),
+        }
+    }
+
+    #[test]
+    fn empty_dir_yields_empty_vec() {
+        let dir = tmp();
+        let entries = replay_at(&dir).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn missing_dir_yields_empty_vec_not_error() {
+        let dir = std::env::temp_dir().join(format!(
+            "memopad_journal_missing_{}_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+            std::process::id(),
+        ));
+        let entries = replay_at(&dir).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn one_file_returns_last_snapshot() {
+        let dir = tmp();
+        snapshot_at(&dir, "buf1", &snap("first", Some("/x.txt"))).unwrap();
+        snapshot_at(&dir, "buf1", &snap("second", Some("/x.txt"))).unwrap();
+        snapshot_at(&dir, "buf1", &snap("third", Some("/x.txt"))).unwrap();
+        let entries = replay_at(&dir).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].buffer_id, "buf1");
+        assert_eq!(entries[0].snapshot.content, "third");
+    }
+
+    #[test]
+    fn multiple_files_each_return_one_entry() {
+        let dir = tmp();
+        snapshot_at(&dir, "a", &snap("Alpha", Some("/a.txt"))).unwrap();
+        snapshot_at(&dir, "b", &snap("Bravo", None)).unwrap();
+        snapshot_at(&dir, "c", &snap("Charlie", Some("/c.txt"))).unwrap();
+        let mut entries = replay_at(&dir).unwrap();
+        entries.sort_by(|x, y| x.buffer_id.cmp(&y.buffer_id));
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].buffer_id, "a");
+        assert_eq!(entries[0].snapshot.content, "Alpha");
+        assert_eq!(entries[1].snapshot.path, None);
+        assert_eq!(entries[2].snapshot.content, "Charlie");
+    }
+
+    #[test]
+    fn non_jsonl_files_are_ignored() {
+        let dir = tmp();
+        snapshot_at(&dir, "real", &snap("data", Some("/r.txt"))).unwrap();
+        std::fs::write(dir.join("README.md"), b"ignored").unwrap();
+        std::fs::write(dir.join("other.txt"), b"ignored").unwrap();
+        let entries = replay_at(&dir).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].buffer_id, "real");
+    }
+
+    #[test]
+    fn corrupt_jsonl_file_is_skipped_not_panicked() {
+        let dir = tmp();
+        snapshot_at(&dir, "good", &snap("good", Some("/g.txt"))).unwrap();
+        std::fs::write(dir.join("bad.jsonl"), b"not valid json\n").unwrap();
+        let entries = replay_at(&dir).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].buffer_id, "good");
     }
 }
