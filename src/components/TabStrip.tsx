@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useBuffers } from '../stores/buffers';
 
 function fileNameOf(path: string | null, untitledIndex: number): string {
@@ -11,6 +12,9 @@ export function TabStrip() {
   const activeId = useBuffers((s) => s.activeId);
   const switchTo = useBuffers((s) => s.switchTo);
   const closeBuffer = useBuffers((s) => s.closeBuffer);
+  const reorderBuffer = useBuffers((s) => s.reorderBuffer);
+
+  const [dragId, setDragId] = useState<string | null>(null);
 
   if (buffers.length === 0) {
     return (
@@ -24,17 +28,36 @@ export function TabStrip() {
 
   return (
     <div className="flex h-full items-stretch overflow-x-auto">
-      {buffers.map((b) => {
+      {buffers.map((b, idx) => {
         const isActive = b.id === activeId;
         const isUntitled = b.path === null;
-        const idx = isUntitled ? ++untitledCounter : 0;
-        const name = fileNameOf(b.path, idx);
+        const fileIdx = isUntitled ? ++untitledCounter : 0;
+        const name = fileNameOf(b.path, fileIdx);
         return (
           <div
             key={b.id}
             role="tab"
             aria-selected={isActive}
             data-buffer-id={b.id}
+            draggable
+            onDragStart={(e) => {
+              setDragId(b.id);
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            onDragOver={(e) => {
+              if (dragId && dragId !== b.id) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }
+            }}
+            onDrop={(e) => {
+              if (dragId && dragId !== b.id) {
+                e.preventDefault();
+                reorderBuffer(dragId, idx);
+              }
+              setDragId(null);
+            }}
+            onDragEnd={() => setDragId(null)}
             onClick={() => switchTo(b.id)}
             onMouseDown={(e) => {
               if (e.button === 1) {
@@ -47,6 +70,7 @@ export function TabStrip() {
               + (isActive
                 ? 'bg-neutral-950 text-neutral-100 shadow-[inset_0_-2px_0_0_theme(colors.amber.400)]'
                 : 'text-neutral-400 hover:bg-neutral-800/60')
+              + (dragId === b.id ? ' opacity-50' : '')
             }
             title={b.path ?? name}
           >
