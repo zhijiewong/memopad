@@ -61,6 +61,17 @@ export function Editor() {
   const [searchFindText, setSearchFindText] = useState('');
   const [searchReplaceText, setSearchReplaceText] = useState('');
 
+  const cursorWriteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistCursor = useCallback((nextCursor: number, nextScrollTop: number) => {
+    if (!active) return;
+    if (cursorWriteTimer.current) clearTimeout(cursorWriteTimer.current);
+    cursorWriteTimer.current = setTimeout(() => {
+      useBuffers.getState().setCursor(active.id, nextCursor);
+      useBuffers.getState().setScrollTop(active.id, nextScrollTop);
+    }, 150);
+  }, [active]);
+
   useEffect(() => {
     globalThis.__memopadSearchPanel = {
       open: (mode) => setSearchPanel({ open: true, mode }),
@@ -145,6 +156,12 @@ export function Editor() {
     setSearchPanel((s) => ({ ...s, open: false }));
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (cursorWriteTimer.current) clearTimeout(cursorWriteTimer.current);
+    };
+  }, []);
+
   if (!active) {
     return (
       <div className="flex h-full w-full items-center justify-center text-xs" style={{ color: 'var(--app-fg-dim)' }}>
@@ -181,6 +198,24 @@ export function Editor() {
           onChange={setActiveContent}
           onCreateEditor={(view) => {
             viewRef.current = view;
+            // Restore cursor + scroll if we have saved positions.
+            if (active && active.cursor != null) {
+              const docLen = view.state.doc.length;
+              const safe = Math.min(active.cursor, docLen);
+              view.dispatch({ selection: { anchor: safe, head: safe } });
+            }
+            if (active && active.scrollTop != null) {
+              // Defer one frame so the editor has laid out.
+              requestAnimationFrame(() => {
+                view.scrollDOM.scrollTop = active.scrollTop ?? 0;
+              });
+            }
+          }}
+          onUpdate={(viewUpdate) => {
+            if (!viewUpdate.selectionSet && !viewUpdate.geometryChanged) return;
+            const head = viewUpdate.state.selection.main.head;
+            const scrollTop = viewUpdate.view.scrollDOM.scrollTop;
+            persistCursor(head, scrollTop);
           }}
           basicSetup={{
             lineNumbers: true,
