@@ -1,3 +1,5 @@
+@import './styles/themes.css';
+
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('./assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
@@ -12,8 +14,6 @@
   font-style: normal;
   font-display: swap;
 }
-
-@import './styles/themes.css';
 
 @tailwind base;
 @tailwind components;
