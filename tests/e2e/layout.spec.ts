@@ -152,4 +152,50 @@ describe('layout invariants', () => {
     expect(info.visibleText).to.include('line one');
     expect(info.visibleText).to.include('line three');
   });
+
+  it('empty-state hint is horizontally centered when no buffer is open', async () => {
+    // Reset to no buffers (resetBuffer creates one — use the raw reset instead).
+    await exec(() => {
+      const w = window as unknown as { __memopadTestReset: () => void };
+      w.__memopadTestReset();
+    });
+
+    await new Promise((r) => setTimeout(r, 200));
+
+    const info = await classicExecute<{
+      windowW: number;
+      hint: { x: number; right: number; w: number; text: string } | null;
+      mainW: number;
+    }>(
+      `var hints = document.querySelectorAll('main *');
+       var hint = null;
+       for (var i = 0; i < hints.length; i++) {
+         if (hints[i].textContent && hints[i].textContent.indexOf('Ctrl+O') >= 0 && hints[i].children.length === 0) {
+           hint = hints[i];
+           break;
+         }
+       }
+       if (!hint) {
+         // The container div might be the one with the text — fall back to the parent of any text node.
+         var main = document.querySelector('main');
+         hint = main && main.firstElementChild;
+       }
+       var r = hint ? hint.getBoundingClientRect() : null;
+       var mainEl = document.querySelector('main');
+       var mainR = mainEl ? mainEl.getBoundingClientRect() : null;
+       return {
+         windowW: window.innerWidth,
+         hint: r ? { x: r.x, right: r.right, w: r.width, text: hint.textContent || '' } : null,
+         mainW: mainR ? mainR.width : 0,
+       };`,
+    );
+    expect(info.hint, 'empty-state hint must render').to.not.equal(null);
+    expect(info.hint!.text).to.include('Ctrl+O');
+    // The hint container must fill the main area (so its centered text appears centered in the window):
+    expect(info.hint!.w, 'empty-state container width').to.be.greaterThan(info.mainW * 0.9);
+    // The container left edge starts at main's left edge (0):
+    expect(info.hint!.x, 'empty-state x').to.be.lessThan(10);
+    // (At the end of the empty-state centering test, before its closing `});`)
+    await getBrowser().saveScreenshot('tests/e2e/phase-4-empty-state.png');
+  });
 });
