@@ -122,6 +122,7 @@ pub fn find_in_folder(
 
     let mut walker = WalkBuilder::new(folder);
     walker.standard_filters(true);
+    walker.require_git(false); // honor .gitignore even outside a git repo
     let walker = walker.build();
 
     for entry in walker {
@@ -198,5 +199,18 @@ mod tests {
         assert_eq!(f.matches[1].line_number, 3);
         assert_eq!(f.matches[1].match_ranges, vec![(0, 5)]);
         assert!(!resp.truncated);
+    }
+
+    #[test]
+    fn respects_gitignore() {
+        let dir = tmp("gitignore");
+        write(&dir, ".gitignore", "target/\n");
+        write(&dir, "src/lib.rs", "fn alpha() {}\n");
+        write(&dir, "target/debug/build.rs", "fn alpha() {}\n");
+
+        let resp = find_in_folder(&dir, "alpha", &FindOptions::default()).unwrap();
+
+        assert_eq!(resp.files.len(), 1);
+        assert!(resp.files[0].path.replace('\\', "/").ends_with("src/lib.rs"));
     }
 }
