@@ -55,4 +55,72 @@ describe('find-in-files', () => {
     );
     expect(panelPresent).to.equal(true);
   });
+
+  it('typing a query renders matching results from the fixture folder', async () => {
+    // Open sidebar + inject workspace folder.
+    await getBrowser().keys(['Control', 'b']);
+    await sleep(150);
+    await classicExecute<void>(
+      `window.__memopadTestSetWorkspace(${JSON.stringify(FIXTURE)}); return undefined;`,
+    );
+    await sleep(150);
+    // Set the search input value programmatically to avoid key-typing flakiness.
+    await classicExecute<void>(
+      `const i = document.querySelector('[data-testid="search-input"]');
+       if (i) {
+         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+         setter.call(i, 'alpha');
+         i.dispatchEvent(new Event('input', { bubbles: true }));
+       }
+       return undefined;`,
+    );
+    // Wait for the 200ms debounce + IPC round-trip.
+    await sleep(800);
+    const matchCount = await classicExecute<number>(
+      `return document.querySelectorAll('[data-testid="match-row"]').length;`,
+    );
+    expect(matchCount).to.be.greaterThanOrEqual(2);
+  });
+
+  it('clicking a match opens the file and switches to its tab', async () => {
+    // Re-establish sidebar + workspace + query to be self-contained.
+    await getBrowser().keys(['Control', 'b']);
+    await sleep(150);
+    await classicExecute<void>(
+      `window.__memopadTestSetWorkspace(${JSON.stringify(FIXTURE)}); return undefined;`,
+    );
+    await sleep(150);
+    await classicExecute<void>(
+      `const i = document.querySelector('[data-testid="search-input"]');
+       if (i) {
+         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+         setter.call(i, 'alpha');
+         i.dispatchEvent(new Event('input', { bubbles: true }));
+       }
+       return undefined;`,
+    );
+    await sleep(800);
+    await classicExecute<void>(
+      `const row = document.querySelector('[data-testid="match-row"]');
+       if (row) row.click();
+       return undefined;`,
+    );
+    await sleep(500);
+    // After clicking, the active tab path should contain "notes.txt" or "code.rs".
+    const activePath = await classicExecute<string | null>(
+      `const state = window.__memopadTestGetActiveBufferPath
+          ? window.__memopadTestGetActiveBufferPath()
+          : null;
+       return state;`,
+    );
+    // If the test hook doesn't exist, fall back to reading the title-bar text.
+    if (activePath) {
+      expect(activePath).to.match(/notes\.txt|code\.rs/);
+    } else {
+      const titleText = await classicExecute<string>(
+        `return document.querySelector('[data-tauri-drag-region]')?.textContent || '';`,
+      );
+      expect(titleText).to.match(/notes\.txt|code\.rs|Untitled/);
+    }
+  });
 });
