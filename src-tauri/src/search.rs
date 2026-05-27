@@ -286,4 +286,43 @@ mod tests {
             other => panic!("expected InvalidRegex, got {:?}", other),
         }
     }
+
+    #[test]
+    fn truncates_at_max_matches() {
+        let dir = tmp("cap");
+        let mut content = String::new();
+        for _ in 0..10_500 { content.push_str("foo\n"); }
+        write(&dir, "a.txt", &content);
+
+        let resp = find_in_folder(&dir, "foo", &FindOptions::default()).unwrap();
+        let total: usize = resp.files.iter().map(|f| f.matches.len()).sum();
+        assert!(resp.truncated, "expected truncated flag");
+        assert!(total <= MAX_MATCHES, "got {} matches, cap is {}", total, MAX_MATCHES);
+        assert!(total >= MAX_MATCHES - 100, "got far fewer than the cap: {}", total);
+    }
+
+    #[test]
+    fn skips_binary_files() {
+        let dir = tmp("binary");
+        let mut bytes: Vec<u8> = b"foo\nfoo".to_vec();
+        bytes.insert(3, 0u8);
+        std::fs::write(dir.join("bin.dat"), bytes).unwrap();
+        write(&dir, "good.txt", "foo\nfoo\n");
+
+        let resp = find_in_folder(&dir, "foo", &FindOptions::default()).unwrap();
+        assert_eq!(resp.files.len(), 1);
+        assert!(resp.files[0].path.ends_with("good.txt"));
+    }
+
+    #[test]
+    fn workspace_missing_returns_error() {
+        let missing = std::env::temp_dir().join("memopad_search_does_not_exist_xyz");
+        let _ = std::fs::remove_dir_all(&missing);
+
+        let err = find_in_folder(&missing, "foo", &FindOptions::default()).unwrap_err();
+        match err {
+            FindError::WorkspaceMissing => {}
+            other => panic!("expected WorkspaceMissing, got {:?}", other),
+        }
+    }
 }
