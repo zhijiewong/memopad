@@ -99,6 +99,16 @@ fn stat_file(path: String) -> Result<stat::FileStat, String> {
     stat::stat_path(&path).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn find_in_folder(
+    folder: String,
+    query: String,
+    opts: search::FindOptions,
+) -> Result<search::FindResponse, String> {
+    search::find_in_folder(std::path::Path::new(&folder), &query, &opts)
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -119,6 +129,7 @@ pub fn run() {
             session_save,
             session_load,
             stat_file,
+            find_in_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
