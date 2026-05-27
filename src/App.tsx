@@ -4,10 +4,12 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { Editor } from './components/Editor';
 import { CommandPalette } from './components/CommandPalette';
 import { StatusBar } from './components/StatusBar';
+import { Sidebar } from './components/Sidebar';
 import { useCommands } from './commands/registry';
 import { registerBuiltins } from './commands/builtins';
 import { useBuffers } from './stores/buffers';
 import { useTheme, effectiveTheme } from './stores/theme';
+import { useWorkspace } from './stores/workspace';
 import { startJournalDebounce } from './lib/journal-debounce';
 import { bootRestore } from './lib/boot';
 import { statFile } from './lib/tauri';
@@ -25,9 +27,11 @@ function runCommand(id: string) {
 
 function persistSession() {
   const state = useBuffers.getState();
+  const folder = useWorkspace.getState().workspaceFolder;
   scheduleSessionSave({
     tabs: state.buffers.map((b) => ({ buffer_id: b.id, path: b.path })),
     active_id: state.activeId,
+    workspace_folder: folder,
   });
 }
 
@@ -65,6 +69,7 @@ async function rescanExternalChanges() {
 
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const themeMode = useTheme((s) => s.mode);
   useEffect(() => {
@@ -101,11 +106,23 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    (window as unknown as { __memopadToggleSidebar?: () => void }).__memopadToggleSidebar = () => setSidebarOpen((v) => !v);
+    (window as unknown as { __memopadOpenSidebarAndFocusFind?: () => void }).__memopadOpenSidebarAndFocusFind = () => {
+      setSidebarOpen(true);
+      requestAnimationFrame(() => {
+        (window as unknown as { __memopadFocusFindInFiles?: () => void }).__memopadFocusFindInFiles?.();
+      });
+    };
+  }, []);
+
+  useEffect(() => {
     const onKey = async (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const key = e.key.toLowerCase();
 
+      if (key === 'b' && !e.shiftKey) { e.preventDefault(); setSidebarOpen((v) => !v); return; }
+      if (key === 'f' && e.shiftKey)  { e.preventDefault(); (window as unknown as { __memopadOpenSidebarAndFocusFind?: () => void }).__memopadOpenSidebarAndFocusFind?.(); return; }
       if (key === 'f' && !e.shiftKey) {
         e.preventDefault();
         globalThis.__memopadSearchPanel?.open('find');
@@ -137,7 +154,13 @@ export default function App() {
       <TitleBar />
       <UpdateBanner />
       <main className="flex flex-1 overflow-hidden">
-        <Editor />
+        <Sidebar
+          open={sidebarOpen}
+          onOpenFolder={() => runCommand('workspace.openFolder')}
+        />
+        <div className="flex flex-1 w-full">
+          <Editor />
+        </div>
       </main>
       <StatusBar />
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} onRun={runCommand} />}
@@ -146,3 +169,6 @@ export default function App() {
 }
 
 (window as unknown as { __memopadTestRunCommand?: (id: string) => void }).__memopadTestRunCommand = runCommand;
+(window as unknown as { __memopadTestSetWorkspace?: (folder: string) => void }).__memopadTestSetWorkspace = (folder: string) => {
+  useWorkspace.getState().setFolder(folder);
+};

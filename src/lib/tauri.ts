@@ -54,6 +54,7 @@ export interface TabEntry {
 export interface SessionState {
   tabs: TabEntry[];
   active_id: string | null;
+  workspace_folder?: string | null;
 }
 
 export interface FileStat {

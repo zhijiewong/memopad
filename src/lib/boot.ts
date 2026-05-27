@@ -1,5 +1,6 @@
 import { useBuffers, type Encoding, type LineEnding } from '../stores/buffers';
 import { journalReplay, sessionLoad, openFile } from './tauri';
+import { useWorkspace } from '../stores/workspace';
 
 function asEncoding(s: string): Encoding {
   if (s === 'utf-8' || s === 'utf-8-bom' || s === 'utf-16-le' || s === 'utf-16-be') return s;
@@ -24,9 +25,11 @@ export async function bootRestore(): Promise<void> {
     }),
     sessionLoad().catch((err) => {
       console.error('session_load failed at boot:', err);
-      return { tabs: [], active_id: null };
+      return { tabs: [], active_id: null, workspace_folder: null };
     }),
   ]);
+
+  useWorkspace.getState().setFolder(session.workspace_folder ?? null);
 
   const journalById = new Map(journalEntries.map((e) => [e.buffer_id, e]));
 
