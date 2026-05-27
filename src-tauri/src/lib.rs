@@ -1,5 +1,6 @@
 mod fs;
 mod journal;
+mod search;
 mod session;
 mod stat;
 
