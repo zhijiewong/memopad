@@ -13,11 +13,13 @@ pub struct TabEntry {
 pub struct SessionState {
     pub tabs: Vec<TabEntry>,
     pub active_id: Option<String>,
+    #[serde(default)]
+    pub workspace_folder: Option<String>,
 }
 
 impl Default for SessionState {
     fn default() -> Self {
-        Self { tabs: Vec::new(), active_id: None }
+        Self { tabs: Vec::new(), active_id: None, workspace_folder: None }
     }
 }
 
@@ -75,6 +77,7 @@ mod tests {
                 TabEntry { buffer_id: "b2".into(), path: None },
             ],
             active_id: Some("b1".into()),
+            workspace_folder: None,
         };
         save_at(&dir, &state).unwrap();
         let loaded = load_at(&dir);
@@ -102,8 +105,31 @@ mod tests {
         save_at(&dir, &SessionState {
             tabs: vec![TabEntry { buffer_id: "old".into(), path: None }],
             active_id: None,
+            workspace_folder: None,
         }).unwrap();
         save_at(&dir, &SessionState::default()).unwrap();
         assert_eq!(load_at(&dir), SessionState::default());
+    }
+
+    #[test]
+    fn loads_old_session_without_workspace_folder() {
+        let dir = tmp();
+        let legacy = r#"{"tabs":[{"buffer_id":"b1","path":"/a.txt"}],"active_id":"b1"}"#;
+        std::fs::write(session_path(&dir), legacy).unwrap();
+        let loaded = load_at(&dir);
+        assert_eq!(loaded.workspace_folder, None);
+        assert_eq!(loaded.tabs.len(), 1);
+    }
+
+    #[test]
+    fn round_trips_workspace_folder() {
+        let dir = tmp();
+        let state = SessionState {
+            tabs: vec![],
+            active_id: None,
+            workspace_folder: Some("C:\\proj".into()),
+        };
+        save_at(&dir, &state).unwrap();
+        assert_eq!(load_at(&dir).workspace_folder, Some("C:\\proj".into()));
     }
 }
