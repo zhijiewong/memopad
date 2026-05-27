@@ -47,4 +47,4 @@ jobs:
 
       - name: cargo test (fs/journal/session/stat modules only)
         working-directory: src-tauri
-        run: cargo test --lib fs:: journal:: session:: stat::
+        run: "cargo test --lib fs:: journal:: session:: stat::"
