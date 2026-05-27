@@ -130,4 +130,40 @@ export function registerBuiltins() {
     shortcut: 'Ctrl+H',
     run: () => globalThis.__memopadSearchPanel?.open('replace'),
   });
+
+  register({
+    id: 'workspace.openFolder',
+    title: 'Open Folder…',
+    run: () => {
+      import('../stores/workspace').then(({ useWorkspace }) => {
+        useWorkspace.getState().openFolder().catch(() => {});
+      });
+    },
+  });
+
+  register({
+    id: 'workspace.closeFolder',
+    title: 'Close Folder',
+    run: () => {
+      import('../stores/workspace').then(({ useWorkspace }) => {
+        useWorkspace.getState().closeFolder();
+      });
+    },
+  });
+
+  register({
+    id: 'view.toggleSidebar',
+    title: 'Toggle Sidebar',
+    run: () => {
+      (window as unknown as { __memopadToggleSidebar?: () => void }).__memopadToggleSidebar?.();
+    },
+  });
+
+  register({
+    id: 'search.focusFindInFiles',
+    title: 'Find in Files',
+    run: () => {
+      (window as unknown as { __memopadOpenSidebarAndFocusFind?: () => void }).__memopadOpenSidebarAndFocusFind?.();
+    },
+  });
 }

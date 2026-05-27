@@ -36,6 +36,17 @@ export function TitleBar() {
       >
         ≡
       </button>
+      <button
+        type="button"
+        title="Toggle sidebar (Ctrl+B)"
+        data-testid="sidebar-toggle"
+        onClick={() => (window as unknown as { __memopadToggleSidebar?: () => void }).__memopadToggleSidebar?.()}
+        className="no-drag flex h-full w-9 items-center justify-center text-sm hover:bg-neutral-800"
+        style={{ color: 'var(--app-fg-muted)' }}
+        aria-label="Toggle sidebar"
+      >
+        ☰
+      </button>
 
       <div className="no-drag flex-1 overflow-hidden">
         <TabStrip />
