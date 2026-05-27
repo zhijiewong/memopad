@@ -1,111 +1,122 @@
-# Memopad release process (manual, v1)
+# Memopad release process
 
-CI runs Vitest + cargo tests on every push. Building and signing a release is
-manual until we set up a tag-triggered release workflow (Phase 7 candidate).
+Releases are automated by `.github/workflows/release.yml`. The one-time setup
+(GitHub repo, signing keypair, secrets) is documented in
+[`github-setup.md`](./github-setup.md). Assuming that's done, every release is
+three commands.
 
-## One-time setup
+## Cutting a release (happy path)
 
-1. **Generate the updater signing keypair** (do this ONCE, then never lose the
-   private key):
-
-   ```powershell
-   cd src-tauri
-   cargo tauri signer generate -w ~/.tauri/memopad.key
-   ```
-
-   The command prints the public key and writes the private key to
-   `~/.tauri/memopad.key`. Copy the public key into `src-tauri/tauri.conf.json`
-   at `plugins.updater.pubkey` (replace the `PLACEHOLDER_...` value). Keep the
-   private key file safe and never commit it.
-
-2. **Confirm the manifest URL** in `tauri.conf.json` points at the correct
-   GitHub repo and asset name. The default is:
-
-   ```
-   https://github.com/GITHUB_OWNER/memopad/releases/latest/download/latest.json
-   ```
-
-   Replace `GITHUB_OWNER` with your actual GitHub username or org.
-
-## Cutting a release
-
-1. **Bump the version.** Set the same string in three places:
+1. Bump the version in three places. Use the same string everywhere:
    - `package.json` → `"version": "0.2.0"`
    - `src-tauri/tauri.conf.json` → `"version": "0.2.0"`
    - `src-tauri/Cargo.toml` → `version = "0.2.0"`
 
-2. **Run every gate locally.** CI runs the cheap ones; the e2e suite + a full
-   release build are local-only:
+2. Update `CHANGELOG.md` — move items from `[Unreleased]` to a new `[0.2.0]`
+   section with the date.
 
+3. Commit, tag, push:
    ```powershell
-   $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-   npm test
-   cd src-tauri; cargo test; cd ..
-   npx tsc --noEmit
-   npm run test:e2e
+   git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml CHANGELOG.md
+   git commit -m "release: v0.2.0"
+   git tag v0.2.0
+   git push
+   git push --tags
    ```
 
-   All four must be green before continuing.
+   The release workflow on GitHub Actions then:
+   - Builds the signed MSI + NSIS bundle on a `windows-latest` runner.
+   - Generates `latest.json` pointing at the NSIS exe.
+   - Publishes a GitHub Release `Memopad v0.2.0` with all four assets.
+   - Pre-release tags (matching `v*.*.*-*` like `v0.2.0-rc1`) become drafts;
+     real semver tags publish directly.
 
-3. **Build a signed release bundle:**
+4. Verify the release page on GitHub. Click the MSI link — it should download.
+   Check `https://github.com/<owner>/memopad/releases/latest/download/latest.json`
+   returns valid JSON with the new version.
 
-   ```powershell
-   $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw "$HOME\.tauri\memopad.key"
-   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""  # empty unless you set one at generate time
-   npm run tauri build
+5. (Optional) Locally launch an older Memopad and watch for the update banner
+   within ~3 seconds. Click **Install and relaunch**.
+
+## Cutting a release (manual / fallback path)
+
+If you need to bypass the workflow (e.g. you don't have GitHub set up, or the
+action is broken), build locally:
+
+```powershell
+$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+npm test
+cd src-tauri; cargo test; cd ..
+npx tsc --noEmit
+npm run test:e2e
+
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw "$HOME\.tauri\memopad.key"
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+npm run tauri build
+```
+
+Then manually compose `latest.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "notes": "Summary of changes.",
+  "pub_date": "2026-05-27T12:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "<contents of Memopad_0.2.0_x64-setup.exe.sig>",
+      "url": "https://github.com/<owner>/memopad/releases/download/v0.2.0/Memopad_0.2.0_x64-setup.exe"
+    }
+  }
+}
+```
+
+Upload the NSIS exe, its `.sig`, the MSI, and `latest.json` to a GitHub Release
+named `Memopad v0.2.0` against the `v0.2.0` tag.
+
+## Code signing (when you obtain a cert)
+
+Memopad currently ships unsigned MSI. Users see a SmartScreen warning on first
+install. To remove that warning, obtain a Windows code-signing certificate
+(EV recommended for instant reputation — ~$300/yr; OV cheaper but accumulates
+reputation slowly).
+
+To enable signing in the release workflow:
+
+1. Convert the cert to a base64-encoded PFX. Store it as the GitHub secret
+   `WINDOWS_CERTIFICATE`.
+2. Store the cert password as `WINDOWS_CERTIFICATE_PASSWORD`.
+3. In `.github/workflows/release.yml`, add these env vars to the `tauri-action`
+   step:
+   ```yaml
+   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+   WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+   WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
    ```
-
-   The bundle command emits:
-   - `src-tauri/target/release/bundle/msi/Memopad_<version>_x64_en-US.msi`
-   - `src-tauri/target/release/bundle/msi/Memopad_<version>_x64_en-US.msi.sig`
-   - `src-tauri/target/release/bundle/nsis/Memopad_<version>_x64-setup.exe`
-   - `src-tauri/target/release/bundle/nsis/Memopad_<version>_x64-setup.exe.sig`
-
-4. **Compose `latest.json`.** Tauri's updater fetches this file to decide
-   whether to offer an update. Create it locally:
-
+4. In `src-tauri/tauri.conf.json` `bundle.windows`, add:
    ```json
-   {
-     "version": "0.2.0",
-     "notes": "What changed in this release.",
-     "pub_date": "2026-05-26T12:00:00Z",
-     "platforms": {
-       "windows-x86_64": {
-         "signature": "<contents of Memopad_0.2.0_x64-setup.exe.sig>",
-         "url": "https://github.com/GITHUB_OWNER/memopad/releases/download/v0.2.0/Memopad_0.2.0_x64-setup.exe"
-       }
-     }
-   }
+   "certificateThumbprint": null,
+   "digestAlgorithm": "sha256",
+   "timestampUrl": "http://timestamp.digicert.com"
    ```
+   (`certificateThumbprint: null` makes Tauri pick up the env var-supplied cert.)
 
-   Replace `<contents of ...>` with the literal text inside the `.sig` file.
-
-5. **Create a Git tag and a GitHub Release.** Tag as `v0.2.0`. Upload these
-   four files to the release:
-   - the NSIS installer (`.exe`)
-   - its signature (`.exe.sig`)
-   - the MSI
-   - `latest.json` (renamed exactly that — the Tauri updater looks for it)
-
-6. **Verify the update.** On a separate machine (or after rolling back to the
-   old version locally), launch Memopad. Within ~3 seconds the UpdateBanner
-   should appear at the top of the window offering the new version. Clicking
-   "Install and relaunch" should download, install, and relaunch into the new
-   version.
+The next tagged release will produce a signed MSI/NSIS pair.
 
 ## Troubleshooting
 
-- **No update banner appears, no console errors.** Check the manifest URL is
-  reachable in a browser and that `latest.json` returns valid JSON.
 - **"Failed to verify signature".** The `pubkey` in `tauri.conf.json` doesn't
   match the private key that signed the bundle. Regenerate or copy-paste
-  carefully — even a trailing newline matters.
+  carefully — trailing newlines matter.
 - **Update downloads but fails to install.** Likely a Windows permissions issue
-  if Memopad is installed under `Program Files`. Tauri's updater requires
-  write access; the app must be installed per-user (the default for an
-  unsigned MSI on Windows) for self-update to work without UAC.
+  if Memopad is installed under `Program Files`. The app installs per-user by
+  default for unsigned MSI on Windows; self-update works without UAC there.
 - **App doesn't relaunch after install.** The Tauri 2 plugin should
-  auto-relaunch on Windows, but on some systems an explicit
-  `relaunch()` call from `@tauri-apps/plugin-process` is required. If you hit
-  this, edit `src/lib/updater.ts` to import `relaunch` and call it after
+  auto-relaunch on Windows, but on some systems an explicit `relaunch()` call
+  from `@tauri-apps/plugin-process` is required. If you hit this, edit
+  `src/lib/updater.ts` to import `relaunch` and call it after
   `update.downloadAndInstall()`.
+- **`releaseBody` is empty in the published release.** The `tauri-action` step
+  uses the `releaseBody` field as-is; if you're using a templated body, ensure
+  there are no unresolved `${{ }}` expressions.
