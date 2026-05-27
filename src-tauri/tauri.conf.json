@@ -34,7 +34,7 @@
       "endpoints": [
         "https://github.com/zhijiewong/memopad/releases/latest/download/latest.json"
       ],
-      "pubkey": "PLACEHOLDER_REPLACE_WITH_REAL_PUBKEY_BEFORE_FIRST_RELEASE",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJFRjEyNEQ1RjJEMzQ1MwpSV1JUTkMxZlRSTHZBa3RXaDhCaStDVkxrQVQ2WUxYYXFYOWxENXZYT2hQUDFoUlNCUEJMam9CcAo=",
       "dialog": false
     }
   },
