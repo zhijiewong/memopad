@@ -111,3 +111,36 @@ export async function statFile(path: string): Promise<FileStat> {
     throw asError(e);
   }
 }
+
+export interface FindOptions {
+  regex: boolean;
+  case_sensitive: boolean;
+  whole_word: boolean;
+}
+
+export interface LineMatch {
+  line_number: number;
+  line_text: string;
+  match_ranges: [number, number][];
+}
+
+export interface FileMatch {
+  path: string;
+  matches: LineMatch[];
+}
+
+export interface FindResponse {
+  files: FileMatch[];
+  truncated: boolean;
+  elapsed_ms: number;
+  /** Frontend-only field populated by the workspace store when find_in_folder rejects. */
+  error?: string;
+}
+
+export async function findInFolder(
+  folder: string,
+  query: string,
+  opts: FindOptions,
+): Promise<FindResponse> {
+  return invoke<FindResponse>('find_in_folder', { folder, query, opts });
+}
