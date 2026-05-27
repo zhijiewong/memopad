@@ -67,6 +67,12 @@ interface BuffersState {
   setScrollTop: (id: string, scrollTop: number | null) => void;
   replaceBuffer: (id: string, next: ReplaceBufferInput) => void;
   resetAll: () => void;
+  openFileAtLine: (
+    path: string,
+    line: number,
+    range: [number, number],
+    snippet: string,
+  ) => void;
 }
 
 const RECENT_CAP = 10;
@@ -281,6 +287,18 @@ export const useBuffers = create<BuffersState>((set, get) => ({
 
   resetAll: () => {
     set({ buffers: [], activeId: null, recentlyClosed: [] });
+  },
+
+  openFileAtLine(path, line, range, _snippet) {
+    const existing = get().buffers.find((b) => b.path === path);
+    if (existing) {
+      set({ activeId: existing.id });
+    } else {
+      (window as unknown as { __memopadPendingJump?: { path: string; line: number; range: [number, number] } }).__memopadPendingJump = { path, line, range };
+    }
+    (window as unknown as {
+      __memopadJumpEditor?: (line: number, range: [number, number]) => void;
+    }).__memopadJumpEditor?.(line, range);
   },
 }));
 

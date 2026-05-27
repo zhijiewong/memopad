@@ -251,3 +251,17 @@ describe('buffers store', () => {
     expect(s.buffers[0].dirty).to.equal(false);
   });
 });
+
+describe('openFileAtLine', () => {
+  it('reuses an existing tab when the path is already open', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: 'C:/a.txt', content: 'line1\nline2\n', encoding: 'utf-8', eol: 'lf',
+    });
+    useBuffers.getState().newBuffer();
+    expect(useBuffers.getState().activeId).not.toBe(id);
+
+    useBuffers.getState().openFileAtLine('C:/a.txt', 2, [0, 4], 'line2');
+
+    expect(useBuffers.getState().activeId).toBe(id);
+  });
+});
