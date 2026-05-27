@@ -85,6 +85,7 @@ dependencies = [
  "grep-searcher",
  "ignore",
  "log",
+ "regex",
  "serde",
  "serde_json",
  "tauri",

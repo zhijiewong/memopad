@@ -61,10 +61,142 @@ impl From<std::io::Error> for FindError {
 }
 
 pub fn find_in_folder(
-    _folder: &Path,
-    _query: &str,
-    _opts: &FindOptions,
+    folder: &Path,
+    query: &str,
+    opts: &FindOptions,
 ) -> Result<FindResponse, FindError> {
-    // Filled in by later tasks.
-    Ok(FindResponse { files: Vec::new(), truncated: false, elapsed_ms: 0 })
+    use std::sync::{Arc, Mutex};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use grep_regex::RegexMatcherBuilder;
+    use grep_searcher::{Searcher, SearcherBuilder, Sink, SinkMatch};
+    use grep_searcher::BinaryDetection;
+    use ignore::WalkBuilder;
+
+    if !folder.exists() {
+        return Err(FindError::WorkspaceMissing);
+    }
+
+    let started = std::time::Instant::now();
+
+    let pattern = if opts.regex { query.to_string() } else { regex::escape(query) };
+    let pattern = if opts.whole_word { format!(r"\b(?:{})\b", pattern) } else { pattern };
+
+    let matcher = RegexMatcherBuilder::new()
+        .case_insensitive(!opts.case_sensitive)
+        .build(&pattern)
+        .map_err(|e| FindError::InvalidRegex(e.to_string()))?;
+
+    let total = Arc::new(AtomicUsize::new(0));
+    let files: Arc<Mutex<Vec<FileMatch>>> = Arc::new(Mutex::new(Vec::new()));
+
+    struct CollectSink<'a> {
+        matcher: &'a grep_regex::RegexMatcher,
+        path: String,
+        matches: Vec<LineMatch>,
+        total: Arc<AtomicUsize>,
+    }
+
+    impl<'a> Sink for CollectSink<'a> {
+        type Error = std::io::Error;
+        fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, std::io::Error> {
+            use grep::matcher::Matcher;
+            let line_number = mat.line_number().unwrap_or(0) as u32;
+            let raw = mat.bytes();
+            let trim_len = if raw.ends_with(b"\n") { raw.len() - 1 } else { raw.len() };
+            let line_text = String::from_utf8_lossy(&raw[..trim_len]).into_owned();
+
+            let mut ranges = Vec::new();
+            self.matcher
+                .find_iter(&raw[..trim_len], |m| {
+                    ranges.push((m.start() as u32, m.end() as u32));
+                    true
+                })
+                .ok();
+
+            self.matches.push(LineMatch { line_number, line_text, match_ranges: ranges });
+            let now = self.total.fetch_add(1, Ordering::Relaxed) + 1;
+            Ok(now < MAX_MATCHES)
+        }
+    }
+
+    let mut walker = WalkBuilder::new(folder);
+    walker.standard_filters(true);
+    let walker = walker.build();
+
+    for entry in walker {
+        if total.load(Ordering::Relaxed) >= MAX_MATCHES { break; }
+        let entry = match entry { Ok(e) => e, Err(_) => continue };
+        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) { continue; }
+
+        let path_str = entry.path().to_string_lossy().to_string();
+        let mut sink = CollectSink {
+            matcher: &matcher,
+            path: path_str.clone(),
+            matches: Vec::new(),
+            total: total.clone(),
+        };
+
+        let mut searcher = SearcherBuilder::new()
+            .binary_detection(BinaryDetection::quit(b'\x00'))
+            .line_number(true)
+            .build();
+        if searcher.search_path(&matcher, entry.path(), &mut sink).is_err() {
+            continue;
+        }
+        if !sink.matches.is_empty() {
+            files.lock().unwrap().push(FileMatch { path: sink.path, matches: sink.matches });
+        }
+    }
+
+    let mut files = Arc::try_unwrap(files).unwrap().into_inner().unwrap();
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+
+    Ok(FindResponse {
+        files,
+        truncated: total.load(Ordering::Relaxed) >= MAX_MATCHES,
+        elapsed_ms: started.elapsed().as_millis() as u64,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "memopad_search_{}_{}_{}",
+            name,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+            std::process::id(),
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write(dir: &std::path::Path, rel: &str, content: &str) {
+        let path = dir.join(rel);
+        if let Some(parent) = path.parent() { std::fs::create_dir_all(parent).unwrap(); }
+        std::fs::write(path, content).unwrap();
+    }
+
+    #[test]
+    fn finds_literal_match_in_single_file() {
+        let dir = tmp("literal");
+        write(&dir, "a.txt", "alpha\nbeta\nalpha gamma\n");
+
+        let resp = find_in_folder(&dir, "alpha", &FindOptions::default()).unwrap();
+
+        assert_eq!(resp.files.len(), 1);
+        let f = &resp.files[0];
+        assert!(f.path.ends_with("a.txt"));
+        assert_eq!(f.matches.len(), 2);
+        assert_eq!(f.matches[0].line_number, 1);
+        assert_eq!(f.matches[0].line_text, "alpha");
+        assert_eq!(f.matches[0].match_ranges, vec![(0, 5)]);
+        assert_eq!(f.matches[1].line_number, 3);
+        assert_eq!(f.matches[1].match_ranges, vec![(0, 5)]);
+        assert!(!resp.truncated);
+    }
 }
