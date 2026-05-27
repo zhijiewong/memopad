@@ -8,8 +8,8 @@ A trim, modern alternative to Notepad++ that does two things noticeably better:
 - **Looks good out of the box.** Warm-neutral light and dark themes, JetBrains
   Mono bundled, chromeless title bar, command palette.
 
-![CI](https://github.com/GITHUB_OWNER/memopad/actions/workflows/ci.yml/badge.svg)
-![E2E](https://github.com/GITHUB_OWNER/memopad/actions/workflows/e2e.yml/badge.svg)
+![CI](https://github.com/zhijiewong/memopad/actions/workflows/ci.yml/badge.svg)
+![E2E](https://github.com/zhijiewong/memopad/actions/workflows/e2e.yml/badge.svg)
 
 ![Dark theme](docs/images/memopad-dark.png)
 
@@ -30,7 +30,7 @@ A trim, modern alternative to Notepad++ that does two things noticeably better:
 
 Memopad is currently Windows-only. macOS and a web build are planned for v2.
 
-1. Download the latest `Memopad_*.msi` from the [Releases](https://github.com/GITHUB_OWNER/memopad/releases) page.
+1. Download the latest `Memopad_*.msi` from the [Releases](https://github.com/zhijiewong/memopad/releases) page.
 2. Run the installer. Windows SmartScreen will show an "unrecognized app" warning
    because the binary is not yet code-signed. Click **More info → Run anyway**.
 3. Launch Memopad from the Start menu.
@@ -74,7 +74,7 @@ Prerequisites:
 - WebView2 runtime (preinstalled on Windows 11)
 
 ```powershell
-git clone https://github.com/GITHUB_OWNER/memopad.git
+git clone https://github.com/zhijiewong/memopad.git
 cd memopad
 npm install
 npm run tauri build
