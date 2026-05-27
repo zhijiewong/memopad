@@ -270,4 +270,20 @@ mod tests {
         assert_eq!(word.files[0].matches.len(), 1);
         assert_eq!(word.files[0].matches[0].line_text, "foo");
     }
+
+    #[test]
+    fn invalid_regex_returns_error() {
+        let dir = tmp("badrx");
+        write(&dir, "a.txt", "anything\n");
+
+        let err = find_in_folder(
+            &dir, "foo(",
+            &FindOptions { regex: true, ..Default::default() },
+        ).unwrap_err();
+
+        match err {
+            FindError::InvalidRegex(_) => {}
+            other => panic!("expected InvalidRegex, got {:?}", other),
+        }
+    }
 }
