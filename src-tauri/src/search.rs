@@ -213,4 +213,61 @@ mod tests {
         assert_eq!(resp.files.len(), 1);
         assert!(resp.files[0].path.replace('\\', "/").ends_with("src/lib.rs"));
     }
+
+    #[test]
+    fn case_sensitive_toggle() {
+        let dir = tmp("case");
+        write(&dir, "a.txt", "Alpha\nalpha\n");
+
+        let insensitive = find_in_folder(
+            &dir, "alpha",
+            &FindOptions { case_sensitive: false, ..Default::default() },
+        ).unwrap();
+        assert_eq!(insensitive.files[0].matches.len(), 2);
+
+        let sensitive = find_in_folder(
+            &dir, "alpha",
+            &FindOptions { case_sensitive: true, ..Default::default() },
+        ).unwrap();
+        assert_eq!(sensitive.files[0].matches.len(), 1);
+        assert_eq!(sensitive.files[0].matches[0].line_text, "alpha");
+    }
+
+    #[test]
+    fn regex_toggle_escapes_literals() {
+        let dir = tmp("regex");
+        write(&dir, "a.txt", "a.b\naXb\n");
+
+        let lit = find_in_folder(
+            &dir, "a.b",
+            &FindOptions { regex: false, ..Default::default() },
+        ).unwrap();
+        assert_eq!(lit.files[0].matches.len(), 1);
+        assert_eq!(lit.files[0].matches[0].line_text, "a.b");
+
+        let re = find_in_folder(
+            &dir, "a.b",
+            &FindOptions { regex: true, ..Default::default() },
+        ).unwrap();
+        assert_eq!(re.files[0].matches.len(), 2);
+    }
+
+    #[test]
+    fn whole_word_toggle() {
+        let dir = tmp("word");
+        write(&dir, "a.txt", "foo\nfood\n");
+
+        let any = find_in_folder(
+            &dir, "foo",
+            &FindOptions { whole_word: false, ..Default::default() },
+        ).unwrap();
+        assert_eq!(any.files[0].matches.len(), 2);
+
+        let word = find_in_folder(
+            &dir, "foo",
+            &FindOptions { whole_word: true, ..Default::default() },
+        ).unwrap();
+        assert_eq!(word.files[0].matches.len(), 1);
+        assert_eq!(word.files[0].matches[0].line_text, "foo");
+    }
 }
