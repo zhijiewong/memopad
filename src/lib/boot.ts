@@ -25,11 +25,21 @@ export async function bootRestore(): Promise<void> {
     }),
     sessionLoad().catch((err) => {
       console.error('session_load failed at boot:', err);
-      return { tabs: [], active_id: null, workspace_folder: null };
+      return { tabs: [], active_id: null, workspace_folder: null, recent_folders: [] };
     }),
   ]);
 
   useWorkspace.getState().setFolder(session.workspace_folder ?? null);
+
+  const fromSession = session.recent_folders ?? [];
+  const wf = session.workspace_folder;
+  if (wf) {
+    const lower = wf.toLowerCase();
+    const filtered = fromSession.filter((p) => p.toLowerCase() !== lower);
+    useWorkspace.getState().setRecent([wf, ...filtered].slice(0, 10));
+  } else {
+    useWorkspace.getState().setRecent(fromSession);
+  }
 
   const journalById = new Map(journalEntries.map((e) => [e.buffer_id, e]));
 

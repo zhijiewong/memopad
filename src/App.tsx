@@ -28,10 +28,12 @@ function runCommand(id: string) {
 function persistSession() {
   const state = useBuffers.getState();
   const folder = useWorkspace.getState().workspaceFolder;
+  const recent = useWorkspace.getState().recentFolders;
   scheduleSessionSave({
     tabs: state.buffers.map((b) => ({ buffer_id: b.id, path: b.path })),
     active_id: state.activeId,
     workspace_folder: folder,
+    recent_folders: recent,
   });
 }
 
@@ -88,6 +90,9 @@ export default function App() {
       persistSession();
       recordStatsForBuffersWithoutOne().catch(() => {});
     });
+    const stopWorkspaceWatcher = useWorkspace.subscribe(() => {
+      persistSession();
+    });
     // No onCloseRequested handler: the store subscription above already
     // persists session.json on every relevant state change, so by the time
     // the user clicks X the file is up to date. Registering a handler at
@@ -101,6 +106,7 @@ export default function App() {
     return () => {
       stopJournal();
       stopSessionWatcher();
+      stopWorkspaceWatcher();
       unlistenFocusP.then((un) => un()).catch(() => {});
     };
   }, []);
