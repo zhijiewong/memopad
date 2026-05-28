@@ -76,8 +76,13 @@ pub fn list_dir(path: &Path) -> Result<Vec<DirEntry>, FilesError> {
 }
 
 /// Public: validate that `path` is under `workspace`, then list it.
-pub fn list_dir_under(_workspace: &Path, _path: &Path) -> Result<Vec<DirEntry>, FilesError> {
-    Ok(Vec::new())
+pub fn list_dir_under(workspace: &Path, path: &Path) -> Result<Vec<DirEntry>, FilesError> {
+    let ws_canon = workspace.canonicalize().map_err(|_| FilesError::PathMissing)?;
+    let path_canon = path.canonicalize().map_err(|_| FilesError::PathMissing)?;
+    if !path_canon.starts_with(&ws_canon) {
+        return Err(FilesError::PathMissing);
+    }
+    list_dir(&path_canon)
 }
 
 #[cfg(test)]
@@ -156,5 +161,38 @@ mod tests {
         let entries = list_dir(&dir).unwrap();
         let names: Vec<String> = entries.iter().map(|e| e.name.clone()).collect();
         assert_eq!(names, vec!["a"]);
+    }
+
+    #[test]
+    fn errors_when_path_missing() {
+        let missing = std::env::temp_dir().join("memopad_files_does_not_exist_xyz_abc");
+        let _ = std::fs::remove_dir_all(&missing);
+        let err = list_dir(&missing).unwrap_err();
+        match err { FilesError::PathMissing => {}, other => panic!("expected PathMissing, got {:?}", other) }
+    }
+
+    #[test]
+    fn errors_when_path_is_file() {
+        let dir = tmp("isfile");
+        touch(&dir, "a.txt");
+        let err = list_dir(&dir.join("a.txt")).unwrap_err();
+        match err { FilesError::NotADirectory => {}, other => panic!("expected NotADirectory, got {:?}", other) }
+    }
+
+    #[test]
+    fn list_dir_under_lists_workspace_itself() {
+        let dir = tmp("under_root");
+        touch(&dir, "a.txt");
+        let entries = list_dir_under(&dir, &dir).unwrap();
+        let names: Vec<String> = entries.iter().map(|e| e.name.clone()).collect();
+        assert_eq!(names, vec!["a.txt"]);
+    }
+
+    #[test]
+    fn rejects_path_outside_workspace() {
+        let workspace = tmp("ws_in");
+        let other = tmp("ws_out");
+        let err = list_dir_under(&workspace, &other).unwrap_err();
+        match err { FilesError::PathMissing => {}, other => panic!("expected PathMissing, got {:?}", other) }
     }
 }
