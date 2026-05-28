@@ -39,6 +39,20 @@ pub struct FindResponse {
     pub elapsed_ms: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileResult {
+    pub path: String,
+    pub matches_replaced: u32,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplaceResponse {
+    pub results: Vec<FileResult>,
+    pub total_files_replaced: u32,
+    pub total_matches_replaced: u32,
+}
+
 #[derive(Debug)]
 pub enum FindError {
     InvalidRegex(String),
@@ -165,6 +179,20 @@ pub fn find_in_folder(
         files,
         truncated: total.load(Ordering::Relaxed) >= MAX_MATCHES,
         elapsed_ms: started.elapsed().as_millis() as u64,
+    })
+}
+
+pub fn replace_in_files(
+    _folder: &Path,
+    _query: &str,
+    _replacement: &str,
+    _opts: &FindOptions,
+    _target_paths: Option<&[String]>,
+) -> Result<ReplaceResponse, FindError> {
+    Ok(ReplaceResponse {
+        results: Vec::new(),
+        total_files_replaced: 0,
+        total_matches_replaced: 0,
     })
 }
 
