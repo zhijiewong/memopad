@@ -1,3 +1,4 @@
+mod files;
 mod fs;
 mod journal;
 mod search;
