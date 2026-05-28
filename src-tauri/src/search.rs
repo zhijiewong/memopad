@@ -60,6 +60,15 @@ impl From<std::io::Error> for FindError {
     fn from(e: std::io::Error) -> Self { FindError::Io(e) }
 }
 
+/// Build the matcher pattern string used by both find and replace. Applies the
+/// FindOptions flags consistently: literal-escape when regex is off, wrap with
+/// `\b(?:…)\b` when whole_word is on. The case_sensitive flag is applied at
+/// builder time by the caller (not in the pattern itself).
+fn build_matcher_pattern(query: &str, opts: &FindOptions) -> String {
+    let pattern = if opts.regex { query.to_string() } else { regex::escape(query) };
+    if opts.whole_word { format!(r"\b(?:{})\b", pattern) } else { pattern }
+}
+
 pub fn find_in_folder(
     folder: &Path,
     query: &str,
@@ -79,8 +88,7 @@ pub fn find_in_folder(
 
     let started = std::time::Instant::now();
 
-    let pattern = if opts.regex { query.to_string() } else { regex::escape(query) };
-    let pattern = if opts.whole_word { format!(r"\b(?:{})\b", pattern) } else { pattern };
+    let pattern = build_matcher_pattern(query, opts);
 
     let matcher = RegexMatcherBuilder::new()
         .case_insensitive(!opts.case_sensitive)
