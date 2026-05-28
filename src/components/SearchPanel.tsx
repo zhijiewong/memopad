@@ -3,6 +3,7 @@ import { useWorkspace } from '../stores/workspace';
 import { openFile as openFileIpc } from '../lib/tauri';
 import { useBuffers } from '../stores/buffers';
 import type { FindOptions, FindResponse, FileMatch, LineMatch } from '../lib/tauri';
+import { ReplaceConfirmDialog } from './ReplaceConfirmDialog';
 
 const DEBOUNCE_MS = 200;
 
@@ -16,6 +17,7 @@ export function SearchPanel() {
   const [query, setQuery] = useState('');
   const [replace, setReplace] = useState('');
   const [replaceVisible, setReplaceVisible] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [opts, setOpts] = useState<FindOptions>({
     regex: false, case_sensitive: false, whole_word: false,
   });
@@ -87,7 +89,20 @@ export function SearchPanel() {
           className="rounded px-1 text-neutral-500 hover:text-neutral-200"
         >×</button>
       </div>
-      <ResultsBody inFlight={inFlight} results={results} />
+      <ResultsBody
+        inFlight={inFlight}
+        results={results}
+        replacement={replace}
+        opts={opts}
+        showReplaceUI={replaceVisible}
+        onReplaceClick={() => setDialogOpen(true)}
+      />
+      {dialogOpen && (
+        <ReplaceConfirmDialog
+          replacement={replace}
+          onClose={() => setDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -110,7 +125,16 @@ function Toggle({ label, title, active, onClick }: { label: string; title: strin
   );
 }
 
-function ResultsBody({ inFlight, results }: { inFlight: boolean; results: FindResponse | null }) {
+function ResultsBody({
+  inFlight, results, replacement, opts, showReplaceUI, onReplaceClick,
+}: {
+  inFlight: boolean;
+  results: FindResponse | null;
+  replacement: string;
+  opts: FindOptions;
+  showReplaceUI: boolean;
+  onReplaceClick: () => void;
+}) {
   if (inFlight && !results) return <div className="p-3 text-xs text-neutral-500">Searching…</div>;
   if (!results) return <div className="p-3 text-xs text-neutral-500">Type to search.</div>;
   if (results.error) return <div data-testid="search-error" className="p-3 text-xs text-red-400">{results.error}</div>;
@@ -122,24 +146,45 @@ function ResultsBody({ inFlight, results }: { inFlight: boolean; results: FindRe
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-auto">
         {results.files.map((f) => (
-          <FileGroup key={f.path} file={f} />
+          <FileGroup
+            key={f.path}
+            file={f}
+            replacement={showReplaceUI ? replacement : undefined}
+            opts={opts}
+          />
         ))}
       </div>
       <div
         data-testid="search-status"
-        className={`border-t border-neutral-700 px-3 py-1 text-xs ${
+        className={`flex items-center justify-between gap-2 border-t border-neutral-700 px-3 py-1 text-xs ${
           results.truncated ? 'text-amber-400' : 'text-neutral-500'
         }`}
       >
-        {results.truncated
-          ? `${total.toLocaleString()}+ matches — refine your query`
-          : `${total.toLocaleString()} match${total === 1 ? '' : 'es'} in ${results.files.length} file${results.files.length === 1 ? '' : 's'}`}
+        <span>
+          {results.truncated
+            ? `${total.toLocaleString()}+ matches — refine your query`
+            : `${total.toLocaleString()} match${total === 1 ? '' : 'es'} in ${results.files.length} file${results.files.length === 1 ? '' : 's'}`}
+        </span>
+        {showReplaceUI && (
+          <button
+            type="button"
+            data-testid="replace-all"
+            onClick={onReplaceClick}
+            className="rounded bg-emerald-700 px-2 py-0.5 text-emerald-100 hover:bg-emerald-600"
+          >
+            Replace All in {results.files.length}
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function FileGroup({ file }: { file: FileMatch }) {
+function FileGroup({ file, replacement, opts }: {
+  file: FileMatch;
+  replacement?: string;
+  opts: FindOptions;
+}) {
   const short = file.path.split(/[/\\]/).pop() ?? file.path;
   return (
     <div className="border-b border-neutral-800">
@@ -147,7 +192,7 @@ function FileGroup({ file }: { file: FileMatch }) {
       <ul>
         {file.matches.map((m, i) => (
           <li key={i}>
-            <ResultRow path={file.path} match={m} />
+            <ResultRow path={file.path} match={m} replacement={replacement} opts={opts} />
           </li>
         ))}
       </ul>
@@ -155,7 +200,12 @@ function FileGroup({ file }: { file: FileMatch }) {
   );
 }
 
-function ResultRow({ path, match }: { path: string; match: LineMatch }) {
+function ResultRow({ path, match, replacement, opts: _opts }: {
+  path: string;
+  match: LineMatch;
+  replacement?: string;
+  opts: FindOptions;
+}) {
   return (
     <button
       type="button"
@@ -175,18 +225,28 @@ function ResultRow({ path, match }: { path: string; match: LineMatch }) {
       title={match.line_text}
     >
       <span className="mr-2 text-neutral-500">{match.line_number}:</span>
-      <Snippet text={match.line_text} ranges={match.match_ranges} />
+      <Snippet text={match.line_text} ranges={match.match_ranges} replacement={replacement} />
     </button>
   );
 }
 
-function Snippet({ text, ranges }: { text: string; ranges: [number, number][] }) {
+function Snippet({ text, ranges, replacement }: {
+  text: string;
+  ranges: [number, number][];
+  replacement?: string;
+}) {
   if (ranges.length === 0) return <span>{text}</span>;
   const parts: import('react').ReactNode[] = [];
   let cursor = 0;
   ranges.forEach(([s, e], i) => {
     if (s > cursor) parts.push(<span key={`p${i}`}>{text.slice(cursor, s)}</span>);
-    parts.push(<mark key={`m${i}`} className="bg-amber-400/30 text-amber-200">{text.slice(s, e)}</mark>);
+    const oldSpan = text.slice(s, e);
+    if (typeof replacement === 'string') {
+      parts.push(<s key={`o${i}`} className="text-neutral-500">{oldSpan}</s>);
+      parts.push(<mark key={`n${i}`} className="bg-emerald-500/30 text-emerald-200">{replacement}</mark>);
+    } else {
+      parts.push(<mark key={`m${i}`} className="bg-amber-400/30 text-amber-200">{oldSpan}</mark>);
+    }
     cursor = e;
   });
   if (cursor < text.length) parts.push(<span key="tail">{text.slice(cursor)}</span>);
