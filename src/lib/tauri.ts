@@ -155,3 +155,27 @@ export interface DirEntry {
 export async function listDir(workspaceFolder: string, path: string): Promise<DirEntry[]> {
   return invoke<DirEntry[]>('list_dir', { workspaceFolder, path });
 }
+
+export interface FileResult {
+  path: string;
+  matches_replaced: number;
+  error: string | null;
+}
+
+export interface ReplaceResponse {
+  results: FileResult[];
+  total_files_replaced: number;
+  total_matches_replaced: number;
+}
+
+export async function replaceInFiles(
+  folder: string,
+  query: string,
+  replacement: string,
+  opts: FindOptions,
+  targetPaths: string[] | null,
+): Promise<ReplaceResponse> {
+  return invoke<ReplaceResponse>('replace_in_files', {
+    folder, query, replacement, opts, targetPaths,
+  });
+}

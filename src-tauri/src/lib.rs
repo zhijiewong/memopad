@@ -119,6 +119,23 @@ fn list_dir(workspace_folder: String, path: String)
     ).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn replace_in_files(
+    folder: String,
+    query: String,
+    replacement: String,
+    opts: search::FindOptions,
+    target_paths: Option<Vec<String>>,
+) -> Result<search::ReplaceResponse, String> {
+    search::replace_in_files(
+        std::path::Path::new(&folder),
+        &query,
+        &replacement,
+        &opts,
+        target_paths.as_deref(),
+    ).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -141,6 +158,7 @@ pub fn run() {
             stat_file,
             find_in_folder,
             list_dir,
+            replace_in_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

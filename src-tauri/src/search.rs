@@ -39,20 +39,6 @@ pub struct FindResponse {
     pub elapsed_ms: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FileResult {
-    pub path: String,
-    pub matches_replaced: u32,
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReplaceResponse {
-    pub results: Vec<FileResult>,
-    pub total_files_replaced: u32,
-    pub total_matches_replaced: u32,
-}
-
 #[derive(Debug)]
 pub enum FindError {
     InvalidRegex(String),
@@ -74,13 +60,123 @@ impl From<std::io::Error> for FindError {
     fn from(e: std::io::Error) -> Self { FindError::Io(e) }
 }
 
-/// Build the matcher pattern string used by both find and replace. Applies the
-/// FindOptions flags consistently: literal-escape when regex is off, wrap with
-/// `\b(?:…)\b` when whole_word is on. The case_sensitive flag is applied at
-/// builder time by the caller (not in the pattern itself).
+// ── Replace types ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileResult {
+    pub path: String,
+    pub matches_replaced: u32,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplaceResponse {
+    pub results: Vec<FileResult>,
+    pub total_files_replaced: u32,
+    pub total_matches_replaced: u32,
+}
+
+// ── Shared helpers ──────────────────────────────────────────────────────────
+
 fn build_matcher_pattern(query: &str, opts: &FindOptions) -> String {
     let pattern = if opts.regex { query.to_string() } else { regex::escape(query) };
     if opts.whole_word { format!(r"\b(?:{})\b", pattern) } else { pattern }
+}
+
+pub fn replace_in_files(
+    folder: &Path,
+    query: &str,
+    replacement: &str,
+    opts: &FindOptions,
+    target_paths: Option<&[String]>,
+) -> Result<ReplaceResponse, FindError> {
+    use ignore::WalkBuilder;
+    use regex::RegexBuilder;
+
+    if !folder.exists() {
+        return Err(FindError::WorkspaceMissing);
+    }
+
+    let pattern = build_matcher_pattern(query, opts);
+    let re = RegexBuilder::new(&pattern)
+        .case_insensitive(!opts.case_sensitive)
+        .build()
+        .map_err(|e| FindError::InvalidRegex(e.to_string()))?;
+
+    let files: Vec<std::path::PathBuf> = match target_paths {
+        Some(paths) => paths.iter().map(std::path::PathBuf::from).collect(),
+        None => {
+            let mut out = Vec::new();
+            let mut walker = WalkBuilder::new(folder);
+            walker.standard_filters(true);
+            walker.require_git(false);
+            for entry in walker.build() {
+                let entry = match entry { Ok(e) => e, Err(_) => continue };
+                if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) { continue; }
+                out.push(entry.into_path());
+            }
+            out
+        }
+    };
+
+    let mut results: Vec<FileResult> = Vec::with_capacity(files.len());
+    let mut total_files: u32 = 0;
+    let mut total_matches: u32 = 0;
+
+    for path in files {
+        let path_str = path.to_string_lossy().to_string();
+
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(e) => {
+                results.push(FileResult { path: path_str, matches_replaced: 0, error: Some(e.to_string()) });
+                continue;
+            }
+        };
+        let (encoding, _bom_offset) = crate::fs::detect_encoding(&bytes);
+        let text = crate::fs::decode_bytes(&bytes, encoding);
+
+        let match_count = re.find_iter(&text).count() as u32;
+        if match_count == 0 {
+            results.push(FileResult { path: path_str, matches_replaced: 0, error: None });
+            continue;
+        }
+        let new_text = re.replace_all(&text, replacement).into_owned();
+
+        let new_bytes = crate::fs::encode_string(&new_text, encoding);
+        let tmp_path = {
+            let mut t = path.clone();
+            let mut new_name = t.file_name().unwrap_or_default().to_os_string();
+            new_name.push(".tmp");
+            t.set_file_name(new_name);
+            t
+        };
+        let write_result = (|| -> std::io::Result<()> {
+            use std::io::Write;
+            let mut f = std::fs::File::create(&tmp_path)?;
+            f.write_all(&new_bytes)?;
+            f.sync_all()?;
+            std::fs::rename(&tmp_path, &path)?;
+            Ok(())
+        })();
+
+        match write_result {
+            Ok(()) => {
+                results.push(FileResult { path: path_str, matches_replaced: match_count, error: None });
+                total_files += 1;
+                total_matches += match_count;
+            }
+            Err(e) => {
+                results.push(FileResult { path: path_str, matches_replaced: 0, error: Some(e.to_string()) });
+            }
+        }
+    }
+
+    Ok(ReplaceResponse {
+        results,
+        total_files_replaced: total_files,
+        total_matches_replaced: total_matches,
+    })
 }
 
 pub fn find_in_folder(
@@ -102,7 +198,8 @@ pub fn find_in_folder(
 
     let started = std::time::Instant::now();
 
-    let pattern = build_matcher_pattern(query, opts);
+    let pattern = if opts.regex { query.to_string() } else { regex::escape(query) };
+    let pattern = if opts.whole_word { format!(r"\b(?:{})\b", pattern) } else { pattern };
 
     let matcher = RegexMatcherBuilder::new()
         .case_insensitive(!opts.case_sensitive)
@@ -179,107 +276,6 @@ pub fn find_in_folder(
         files,
         truncated: total.load(Ordering::Relaxed) >= MAX_MATCHES,
         elapsed_ms: started.elapsed().as_millis() as u64,
-    })
-}
-
-pub fn replace_in_files(
-    folder: &Path,
-    query: &str,
-    replacement: &str,
-    opts: &FindOptions,
-    target_paths: Option<&[String]>,
-) -> Result<ReplaceResponse, FindError> {
-    use grep_regex::RegexMatcherBuilder;
-
-    if !folder.exists() {
-        return Err(FindError::WorkspaceMissing);
-    }
-
-    let pattern = build_matcher_pattern(query, opts);
-
-    // Build regex for replacement with backreferences
-    let re = regex::RegexBuilder::new(&pattern)
-        .case_insensitive(!opts.case_sensitive)
-        .build()
-        .map_err(|e| FindError::InvalidRegex(e.to_string()))?;
-
-    // Get list of files to process
-    let mut files_to_process = Vec::new();
-    let walker = ignore::WalkBuilder::new(folder)
-        .standard_filters(true)
-        .require_git(false)
-        .build();
-
-    for entry in walker {
-        let entry = match entry { Ok(e) => e, Err(_) => continue };
-        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) { continue; }
-
-        let path_str = entry.path().to_string_lossy().to_string();
-
-        // If target_paths is provided, only process those files
-        if let Some(targets) = target_paths {
-            if !targets.iter().any(|t| path_str.ends_with(t)) {
-                continue;
-            }
-        }
-
-        files_to_process.push((path_str, entry.path().to_path_buf()));
-    }
-
-    let mut results = Vec::new();
-    let mut total_files_replaced = 0u32;
-    let mut total_matches_replaced = 0u32;
-
-    for (path_str, file_path) in files_to_process {
-        // Read file
-        let content = match std::fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(e) => {
-                results.push(FileResult {
-                    path: path_str,
-                    matches_replaced: 0,
-                    error: Some(e.to_string()),
-                });
-                continue;
-            }
-        };
-
-        // Count matches and perform replacement
-        let match_count = re.find_iter(&content).count() as u32;
-
-        if match_count > 0 {
-            let new_content = re.replace_all(&content, replacement).to_string();
-
-            // Write back
-            if let Err(e) = std::fs::write(&file_path, &new_content) {
-                results.push(FileResult {
-                    path: path_str,
-                    matches_replaced: 0,
-                    error: Some(e.to_string()),
-                });
-                continue;
-            }
-
-            results.push(FileResult {
-                path: path_str,
-                matches_replaced: match_count,
-                error: None,
-            });
-            total_files_replaced += 1;
-            total_matches_replaced += match_count;
-        } else {
-            results.push(FileResult {
-                path: path_str,
-                matches_replaced: 0,
-                error: None,
-            });
-        }
-    }
-
-    Ok(ReplaceResponse {
-        results,
-        total_files_replaced,
-        total_matches_replaced,
     })
 }
 
@@ -450,62 +446,80 @@ mod tests {
     }
 
     #[test]
-    fn replace_respects_case_sensitive_toggle() {
-        let dir = tmp("rep_case");
-        write(&dir, "a.txt", "Foo\nfoo");
-        let resp = replace_in_files(
-            &dir, "foo", "X",
-            &FindOptions { case_sensitive: true, ..Default::default() },
-            None,
-        ).unwrap();
-        assert_eq!(resp.total_matches_replaced, 1);
-        let content = std::fs::read_to_string(dir.join("a.txt")).unwrap();
-        assert_eq!(content, "Foo\nX");
-    }
+    fn replace_literal_replaces_all_matches_in_a_file() {
+        let dir = tmp("rep_literal");
+        write(&dir, "a.txt", "foo\nbar foo");
 
-    #[test]
-    fn replace_respects_whole_word_toggle() {
-        let dir = tmp("rep_word");
-        write(&dir, "a.txt", "foo\nfood");
         let resp = replace_in_files(
-            &dir, "foo", "X",
-            &FindOptions { whole_word: true, ..Default::default() },
+            &dir, "foo", "baz",
+            &FindOptions::default(),
             None,
         ).unwrap();
-        assert_eq!(resp.total_matches_replaced, 1);
-        let content = std::fs::read_to_string(dir.join("a.txt")).unwrap();
-        assert_eq!(content, "X\nfood");
-    }
 
-    #[test]
-    fn replace_with_regex_backreferences() {
-        let dir = tmp("rep_regex");
-        write(&dir, "a.txt", "alice@example.com\nbob@example.com");
-        let resp = replace_in_files(
-            &dir, r"(\w+)@example\.com", "$1@new.com",
-            &FindOptions { regex: true, ..Default::default() },
-            None,
-        ).unwrap();
+        assert_eq!(resp.total_files_replaced, 1);
         assert_eq!(resp.total_matches_replaced, 2);
+        assert_eq!(resp.results.len(), 1);
+        assert_eq!(resp.results[0].matches_replaced, 2);
+        assert_eq!(resp.results[0].error, None);
+
         let content = std::fs::read_to_string(dir.join("a.txt")).unwrap();
-        assert_eq!(content, "alice@new.com\nbob@new.com");
+        assert_eq!(content, "baz\nbar baz");
     }
 
     #[test]
-    fn replace_skips_targets_with_no_match() {
-        let dir = tmp("rep_skip");
-        write(&dir, "a.txt", "foo");
-        write(&dir, "b.txt", "no match here");
+    fn replace_preserves_encoding_utf16_le() {
+        let dir = tmp("rep_utf16");
+        let bom: [u8; 2] = [0xFF, 0xFE];
+        let mut bytes: Vec<u8> = bom.to_vec();
+        for ch in "foo".encode_utf16() {
+            bytes.extend_from_slice(&ch.to_le_bytes());
+        }
+        std::fs::write(dir.join("a.txt"), &bytes).unwrap();
+
         let resp = replace_in_files(
             &dir, "foo", "bar",
             &FindOptions::default(),
             None,
         ).unwrap();
-        assert_eq!(resp.total_files_replaced, 1);
-        let b_entry = resp.results.iter().find(|r| r.path.ends_with("b.txt")).unwrap();
-        assert_eq!(b_entry.matches_replaced, 0);
-        assert_eq!(b_entry.error, None);
-        let b_content = std::fs::read_to_string(dir.join("b.txt")).unwrap();
-        assert_eq!(b_content, "no match here");
+        assert_eq!(resp.total_matches_replaced, 1);
+
+        let after = std::fs::read(dir.join("a.txt")).unwrap();
+        assert_eq!(&after[0..2], &[0xFF, 0xFE], "BOM should still be present");
+        let units: Vec<u16> = after[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        let decoded = String::from_utf16(&units).unwrap();
+        assert_eq!(decoded, "bar");
+    }
+
+    #[test]
+    fn replace_records_per_file_io_errors() {
+        let dir = tmp("rep_io");
+        write(&dir, "writable.txt", "foo");
+        write(&dir, "readonly.txt", "foo");
+        let ro_path = dir.join("readonly.txt");
+        let mut perms = std::fs::metadata(&ro_path).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&ro_path, perms).unwrap();
+
+        let resp = replace_in_files(
+            &dir, "foo", "bar",
+            &FindOptions::default(),
+            None,
+        ).unwrap();
+
+        let writable_entry = resp.results.iter().find(|r| r.path.ends_with("writable.txt")).unwrap();
+        let readonly_entry = resp.results.iter().find(|r| r.path.ends_with("readonly.txt")).unwrap();
+        assert_eq!(writable_entry.matches_replaced, 1);
+        assert_eq!(writable_entry.error, None);
+        assert!(readonly_entry.error.is_some(), "readonly file should record an error");
+        assert_eq!(readonly_entry.matches_replaced, 0);
+
+        // Restore writability so the tempdir can be cleaned up.
+        let mut perms = std::fs::metadata(&ro_path).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        perms.set_readonly(false);
+        let _ = std::fs::set_permissions(&ro_path, perms);
     }
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { findInFolder, listDir, type FindOptions, type FindResponse, type DirEntry } from '../lib/tauri';
+import { findInFolder, listDir, replaceInFiles as replaceInFilesIpc, type FindOptions, type FindResponse, type DirEntry, type ReplaceResponse } from '../lib/tauri';
 
 interface WorkspaceState {
   workspaceFolder: string | null;
@@ -15,6 +15,8 @@ interface WorkspaceState {
   childrenByPath: Map<string, DirEntry[]>;
   loadingByPath: Set<string>;
 
+  replaceInFlight: boolean;
+
   openFolder: () => Promise<void>;
   closeFolder: () => void;
   runSearch: (query: string, opts: FindOptions) => Promise<void>;
@@ -22,6 +24,7 @@ interface WorkspaceState {
   setFolder: (folder: string | null) => void;
   toggleExpand: (path: string) => Promise<void>;
   refreshSubtree: (path: string) => Promise<void>;
+  replaceInFiles: (replacement: string) => Promise<ReplaceResponse>;
   clearTreeCache: () => void;
 }
 
@@ -29,6 +32,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   workspaceFolder: null,
   results: null,
   inFlight: false,
+  replaceInFlight: false,
   lastQuery: '',
   lastOpts: { regex: false, case_sensitive: false, whole_word: false },
   requestId: 0,
@@ -130,6 +134,41 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       newLoading.delete(path);
       set({ loadingByPath: newLoading });
     }
+  },
+
+  async replaceInFiles(replacement) {
+    const cur = get();
+    if (!cur.workspaceFolder) {
+      return { results: [], total_files_replaced: 0, total_matches_replaced: 0 };
+    }
+    if (!cur.results || cur.results.files.length === 0) {
+      return { results: [], total_files_replaced: 0, total_matches_replaced: 0 };
+    }
+    if (cur.lastQuery.trim() === '') {
+      return { results: [], total_files_replaced: 0, total_matches_replaced: 0 };
+    }
+
+    const targetPaths = cur.results.files.map((f) => f.path);
+    set({ replaceInFlight: true });
+    let resp: ReplaceResponse;
+    try {
+      resp = await replaceInFilesIpc(
+        cur.workspaceFolder, cur.lastQuery, replacement, cur.lastOpts, targetPaths,
+      );
+    } finally {
+      set({ replaceInFlight: false });
+    }
+
+    await get().runSearch(cur.lastQuery, cur.lastOpts);
+
+    const { useBuffers } = await import('./buffers');
+    for (const r of resp.results) {
+      if (r.error == null && r.matches_replaced > 0) {
+        await useBuffers.getState().reloadIfOpen(r.path);
+      }
+    }
+
+    return resp;
   },
 
   clearTreeCache() {

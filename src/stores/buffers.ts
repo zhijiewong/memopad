@@ -66,6 +66,7 @@ interface BuffersState {
   setCursor: (id: string, cursor: number | null) => void;
   setScrollTop: (id: string, scrollTop: number | null) => void;
   replaceBuffer: (id: string, next: ReplaceBufferInput) => void;
+  reloadIfOpen: (path: string) => Promise<void>;
   resetAll: () => void;
   openFileAtLine: (
     path: string,
@@ -283,6 +284,24 @@ export const useBuffers = create<BuffersState>((set, get) => ({
           : b,
       ),
     }));
+  },
+
+  async reloadIfOpen(path) {
+    const existing = get().buffers.find((b) => b.path === path);
+    if (!existing) return;
+    if (existing.dirty) return;
+    try {
+      const { openFile } = await import('../lib/tauri');
+      const opened = await openFile(path);
+      get().replaceBuffer(existing.id, {
+        path: opened.path,
+        content: opened.content,
+        encoding: opened.encoding,
+        eol: opened.eol,
+      });
+    } catch {
+      // Best-effort: swallow.
+    }
   },
 
   resetAll: () => {
