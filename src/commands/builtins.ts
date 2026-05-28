@@ -166,4 +166,12 @@ export function registerBuiltins() {
       (window as unknown as { __memopadOpenSidebarAndFocusFind?: () => void }).__memopadOpenSidebarAndFocusFind?.();
     },
   });
+
+  register({
+    id: 'view.toggleSidebarTab',
+    title: 'Toggle Sidebar Tab (Files/Search)',
+    run: () => {
+      (window as unknown as { __memopadToggleSidebarTab?: () => void }).__memopadToggleSidebarTab?.();
+    },
+  });
 }
