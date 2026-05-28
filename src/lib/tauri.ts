@@ -145,3 +145,13 @@ export async function findInFolder(
 ): Promise<FindResponse> {
   return invoke<FindResponse>('find_in_folder', { folder, query, opts });
 }
+
+export interface DirEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+}
+
+export async function listDir(workspaceFolder: string, path: string): Promise<DirEntry[]> {
+  return invoke<DirEntry[]>('list_dir', { workspaceFolder, path });
+}
