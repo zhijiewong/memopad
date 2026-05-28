@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useBuffers } from '../stores/buffers';
 
 describe('buffers store', () => {
@@ -263,5 +263,48 @@ describe('openFileAtLine', () => {
     useBuffers.getState().openFileAtLine('C:/a.txt', 2, [0, 4], 'line2');
 
     expect(useBuffers.getState().activeId).toBe(id);
+  });
+});
+
+describe('reloadIfOpen', () => {
+  it('replaces content and preserves id', async () => {
+    vi.resetModules();
+    const tauri = await import('../lib/tauri');
+    const spy = vi.spyOn(tauri, 'openFile').mockResolvedValue({
+      path: 'C:/r.txt', content: 'NEW', encoding: 'utf-8', eol: 'lf',
+    });
+
+    const id = useBuffers.getState().openBuffer({
+      path: 'C:/r.txt', content: 'OLD', encoding: 'utf-8', eol: 'lf',
+    });
+    await useBuffers.getState().reloadIfOpen('C:/r.txt');
+
+    const buf = useBuffers.getState().buffers.find((b) => b.id === id);
+    expect(buf?.content).toBe('NEW');
+    expect(buf?.id).toBe(id);
+    spy.mockRestore();
+  });
+
+  it('does nothing for unknown path', async () => {
+    await useBuffers.getState().reloadIfOpen('C:/never-opened.txt');
+    expect(useBuffers.getState().buffers.find((b) => b.path === 'C:/never-opened.txt')).toBeUndefined();
+  });
+
+  it('skips dirty buffers', async () => {
+    vi.resetModules();
+    const tauri = await import('../lib/tauri');
+    const spy = vi.spyOn(tauri, 'openFile');
+
+    const id = useBuffers.getState().openBuffer({
+      path: 'C:/d.txt', content: 'OLD', encoding: 'utf-8', eol: 'lf',
+    });
+    useBuffers.getState().switchTo(id);
+    useBuffers.getState().setActiveContent('EDITED');
+    await useBuffers.getState().reloadIfOpen('C:/d.txt');
+
+    expect(spy).not.toHaveBeenCalled();
+    const buf = useBuffers.getState().buffers.find((b) => b.id === id);
+    expect(buf?.content).toBe('EDITED');
+    spy.mockRestore();
   });
 });
