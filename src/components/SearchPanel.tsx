@@ -14,6 +14,8 @@ export function SearchPanel() {
   const closeFolder = useWorkspace((s) => s.closeFolder);
 
   const [query, setQuery] = useState('');
+  const [replace, setReplace] = useState('');
+  const [replaceVisible, setReplaceVisible] = useState(false);
   const [opts, setOpts] = useState<FindOptions>({
     regex: false, case_sensitive: false, whole_word: false,
   });
@@ -35,16 +37,35 @@ export function SearchPanel() {
 
   return (
     <div data-testid="search-panel" className="flex flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-neutral-700 px-3 py-2">
-        <input
-          ref={inputRef}
-          data-testid="search-input"
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search"
-          className="flex-1 rounded bg-neutral-800 px-2 py-1 text-sm text-neutral-100 outline-none focus:ring-1 focus:ring-neutral-500"
-        />
+      <div className="flex flex-col gap-1 border-b border-neutral-700 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="replace-toggle"
+            onClick={() => setReplaceVisible((v) => !v)}
+            title={replaceVisible ? 'Hide replace' : 'Show replace'}
+            className="rounded px-1 text-neutral-500 hover:text-neutral-200"
+          >↔</button>
+          <input
+            ref={inputRef}
+            data-testid="search-input"
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search"
+            className="flex-1 rounded bg-neutral-800 px-2 py-1 text-sm text-neutral-100 outline-none focus:ring-1 focus:ring-neutral-500"
+          />
+        </div>
+        {replaceVisible && (
+          <input
+            data-testid="replace-input"
+            type="text"
+            value={replace}
+            onChange={(e) => setReplace(e.target.value)}
+            placeholder="Replace"
+            className="ml-6 flex-1 rounded bg-neutral-800 px-2 py-1 text-sm text-neutral-100 outline-none focus:ring-1 focus:ring-neutral-500"
+          />
+        )}
       </div>
       <div className="flex items-center gap-1 border-b border-neutral-700 px-3 py-1 text-xs">
         <Toggle label="Aa" title="Case sensitive" active={opts.case_sensitive}
