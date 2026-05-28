@@ -32,6 +32,35 @@ async function doSave(saveAs: boolean) {
   }
 }
 
+export function registerRecentFolderCommands(paths: string[]) {
+  const { commands, register, unregister } = useCommands.getState();
+  // Unregister previous dynamic recents.
+  for (const c of commands) {
+    if (c.id.startsWith('workspace.recent.')) unregister(c.id);
+  }
+  // Register fresh ones.
+  paths.forEach((p, i) => {
+    const basename = p.split(/[/\\]/).filter(Boolean).pop() ?? p;
+    register({
+      id: `workspace.recent.${i}`,
+      title: `Open Recent: ${basename}`,
+      run: async () => {
+        const { useWorkspace } = await import('../stores/workspace');
+        const { statFile } = await import('../lib/tauri');
+        try {
+          await statFile(p);
+        } catch {
+          useWorkspace.getState().removeRecentFolder(p);
+          console.warn(`Recent folder no longer exists: ${p}`);
+          return;
+        }
+        useWorkspace.getState().setFolder(p);
+        useWorkspace.getState().pushRecentFolder(p);
+      },
+    });
+  });
+}
+
 export function registerBuiltins() {
   const { register } = useCommands.getState();
 
@@ -172,6 +201,16 @@ export function registerBuiltins() {
     title: 'Toggle Sidebar Tab (Files/Search)',
     run: () => {
       (window as unknown as { __memopadToggleSidebarTab?: () => void }).__memopadToggleSidebarTab?.();
+    },
+  });
+
+  register({
+    id: 'workspace.openRecent',
+    title: 'Open Recent Folder…',
+    shortcut: 'Ctrl+R',
+    run: () => {
+      (window as unknown as { __memopadOpenPaletteWithQuery?: (q: string) => void })
+        .__memopadOpenPaletteWithQuery?.('Open Recent: ');
     },
   });
 }

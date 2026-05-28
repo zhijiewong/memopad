@@ -6,7 +6,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { StatusBar } from './components/StatusBar';
 import { Sidebar } from './components/Sidebar';
 import { useCommands } from './commands/registry';
-import { registerBuiltins } from './commands/builtins';
+import { registerBuiltins, registerRecentFolderCommands } from './commands/builtins';
 import { useBuffers } from './stores/buffers';
 import { useTheme, effectiveTheme } from './stores/theme';
 import { useWorkspace } from './stores/workspace';
@@ -28,10 +28,12 @@ function runCommand(id: string) {
 function persistSession() {
   const state = useBuffers.getState();
   const folder = useWorkspace.getState().workspaceFolder;
+  const recent = useWorkspace.getState().recentFolders;
   scheduleSessionSave({
     tabs: state.buffers.map((b) => ({ buffer_id: b.id, path: b.path })),
     active_id: state.activeId,
     workspace_folder: folder,
+    recent_folders: recent,
   });
 }
 
@@ -70,6 +72,7 @@ async function rescanExternalChanges() {
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [presetQuery, setPresetQuery] = useState('');
 
   const themeMode = useTheme((s) => s.mode);
   useEffect(() => {
@@ -81,12 +84,23 @@ export default function App() {
   useEffect(() => {
     bootRestore()
       .then(() => recordStatsForBuffersWithoutOne())
+      .then(() => {
+        registerRecentFolderCommands(useWorkspace.getState().recentFolders);
+      })
       .catch((err) => console.error('boot failed:', err));
 
     const stopJournal = startJournalDebounce();
     const stopSessionWatcher = useBuffers.subscribe(() => {
       persistSession();
       recordStatsForBuffersWithoutOne().catch(() => {});
+    });
+    const stopWorkspaceWatcher = useWorkspace.subscribe(() => {
+      persistSession();
+    });
+    const stopRecentWatcher = useWorkspace.subscribe((state, prev) => {
+      if (state.recentFolders !== prev.recentFolders) {
+        registerRecentFolderCommands(state.recentFolders);
+      }
     });
     // No onCloseRequested handler: the store subscription above already
     // persists session.json on every relevant state change, so by the time
@@ -101,6 +115,8 @@ export default function App() {
     return () => {
       stopJournal();
       stopSessionWatcher();
+      stopWorkspaceWatcher();
+      stopRecentWatcher();
       unlistenFocusP.then((un) => un()).catch(() => {});
     };
   }, []);
@@ -113,6 +129,10 @@ export default function App() {
         (window as unknown as { __memopadFocusFindInFiles?: () => void }).__memopadFocusFindInFiles?.();
       });
     };
+    (window as unknown as { __memopadOpenPaletteWithQuery?: (q: string) => void }).__memopadOpenPaletteWithQuery = (q: string) => {
+      setPresetQuery(q);
+      setPaletteOpen(true);
+    };
   }, []);
 
   useEffect(() => {
@@ -122,6 +142,11 @@ export default function App() {
       const key = e.key.toLowerCase();
 
       if (key === 'b' && !e.shiftKey) { e.preventDefault(); setSidebarOpen((v) => !v); return; }
+      if (key === 'r' && !e.shiftKey) {
+        e.preventDefault();
+        runCommand('workspace.openRecent');
+        return;
+      }
       if (key === 'e' && e.shiftKey) {
         e.preventDefault();
         (window as unknown as { __memopadToggleSidebarTab?: () => void }).__memopadToggleSidebarTab?.();
@@ -168,7 +193,13 @@ export default function App() {
         </div>
       </main>
       <StatusBar />
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} onRun={runCommand} />}
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => { setPaletteOpen(false); setPresetQuery(''); }}
+          onRun={runCommand}
+          initialQuery={presetQuery}
+        />
+      )}
     </div>
   );
 }
@@ -176,4 +207,7 @@ export default function App() {
 (window as unknown as { __memopadTestRunCommand?: (id: string) => void }).__memopadTestRunCommand = runCommand;
 (window as unknown as { __memopadTestSetWorkspace?: (folder: string) => void }).__memopadTestSetWorkspace = (folder: string) => {
   useWorkspace.getState().setFolder(folder);
+};
+(window as unknown as { __memopadTestPushRecent?: (folder: string) => void }).__memopadTestPushRecent = (folder: string) => {
+  useWorkspace.getState().pushRecentFolder(folder);
 };

@@ -17,6 +17,12 @@ interface WorkspaceState {
 
   replaceInFlight: boolean;
 
+  recentFolders: string[];
+
+  pushRecentFolder: (path: string) => void;
+  removeRecentFolder: (path: string) => void;
+  setRecent: (list: string[]) => void;
+
   openFolder: () => Promise<void>;
   closeFolder: () => void;
   runSearch: (query: string, opts: FindOptions) => Promise<void>;
@@ -39,6 +45,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   expanded: new Set<string>(),
   childrenByPath: new Map<string, DirEntry[]>(),
   loadingByPath: new Set<string>(),
+  recentFolders: [],
 
   async openFolder() {
     const picked = await openDialog({ directory: true, multiple: false });
@@ -50,6 +57,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         childrenByPath: new Map<string, DirEntry[]>(),
         loadingByPath: new Set<string>(),
       });
+      get().pushRecentFolder(picked);
     }
   },
 
@@ -181,4 +189,23 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   clearResults() { set({ results: null }); },
   setFolder(folder) { set({ workspaceFolder: folder }); },
+
+  pushRecentFolder(path) {
+    const normalize = (p: string) => p.toLowerCase().replace(/\\/g, '/');
+    const cur = get().recentFolders;
+    const norm = normalize(path);
+    const filtered = cur.filter((p) => normalize(p) !== norm);
+    const next = [path, ...filtered].slice(0, 10);
+    set({ recentFolders: next });
+  },
+
+  removeRecentFolder(path) {
+    const normalize = (p: string) => p.toLowerCase().replace(/\\/g, '/');
+    const norm = normalize(path);
+    set({ recentFolders: get().recentFolders.filter((p) => normalize(p) !== norm) });
+  },
+
+  setRecent(list) {
+    set({ recentFolders: list.slice(0, 10) });
+  },
 }));
