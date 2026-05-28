@@ -38,11 +38,84 @@ impl From<std::io::Error> for FilesError {
 /// Internal: list the immediate children of `path` (depth=1) honoring
 /// .gitignore / .ignore / hidden files. Sorted: dirs first, then files,
 /// both alphabetically case-insensitive. The root itself is excluded.
-pub fn list_dir(_path: &Path) -> Result<Vec<DirEntry>, FilesError> {
-    Ok(Vec::new())
+pub fn list_dir(path: &Path) -> Result<Vec<DirEntry>, FilesError> {
+    use ignore::WalkBuilder;
+
+    if !path.exists() {
+        return Err(FilesError::PathMissing);
+    }
+    if !path.is_dir() {
+        return Err(FilesError::NotADirectory);
+    }
+
+    let mut entries: Vec<DirEntry> = Vec::new();
+    let walker = WalkBuilder::new(path)
+        .standard_filters(true)
+        .max_depth(Some(1))
+        .require_git(false)
+        .build();
+
+    for result in walker {
+        let entry = match result { Ok(e) => e, Err(_) => continue };
+        if entry.depth() == 0 { continue; }
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let name = entry.file_name().to_string_lossy().to_string();
+        let path = entry.path().to_string_lossy().to_string();
+        entries.push(DirEntry { name, path, is_dir });
+    }
+
+    entries.sort_by(|a, b| {
+        match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        }
+    });
+
+    Ok(entries)
 }
 
 /// Public: validate that `path` is under `workspace`, then list it.
 pub fn list_dir_under(_workspace: &Path, _path: &Path) -> Result<Vec<DirEntry>, FilesError> {
     Ok(Vec::new())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "memopad_files_{}_{}_{}",
+            name,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+            std::process::id(),
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn touch(dir: &std::path::Path, rel: &str) {
+        let path = dir.join(rel);
+        if let Some(parent) = path.parent() { std::fs::create_dir_all(parent).unwrap(); }
+        std::fs::write(path, b"").unwrap();
+    }
+
+    #[test]
+    fn lists_files_and_dirs_sorted() {
+        let dir = tmp("sorted");
+        std::fs::create_dir_all(dir.join("A")).unwrap();
+        std::fs::create_dir_all(dir.join("B")).unwrap();
+        touch(&dir, "b.txt");
+        touch(&dir, "c.rs");
+
+        let entries = list_dir(&dir).unwrap();
+        let names: Vec<String> = entries.iter().map(|e| e.name.clone()).collect();
+        assert_eq!(names, vec!["A", "B", "b.txt", "c.rs"]);
+        assert_eq!(entries[0].is_dir, true);
+        assert_eq!(entries[1].is_dir, true);
+        assert_eq!(entries[2].is_dir, false);
+        assert_eq!(entries[3].is_dir, false);
+    }
 }
