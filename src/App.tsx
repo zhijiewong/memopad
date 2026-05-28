@@ -6,7 +6,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { StatusBar } from './components/StatusBar';
 import { Sidebar } from './components/Sidebar';
 import { useCommands } from './commands/registry';
-import { registerBuiltins } from './commands/builtins';
+import { registerBuiltins, registerRecentFolderCommands } from './commands/builtins';
 import { useBuffers } from './stores/buffers';
 import { useTheme, effectiveTheme } from './stores/theme';
 import { useWorkspace } from './stores/workspace';
@@ -84,6 +84,9 @@ export default function App() {
   useEffect(() => {
     bootRestore()
       .then(() => recordStatsForBuffersWithoutOne())
+      .then(() => {
+        registerRecentFolderCommands(useWorkspace.getState().recentFolders);
+      })
       .catch((err) => console.error('boot failed:', err));
 
     const stopJournal = startJournalDebounce();
@@ -93,6 +96,11 @@ export default function App() {
     });
     const stopWorkspaceWatcher = useWorkspace.subscribe(() => {
       persistSession();
+    });
+    const stopRecentWatcher = useWorkspace.subscribe((state, prev) => {
+      if (state.recentFolders !== prev.recentFolders) {
+        registerRecentFolderCommands(state.recentFolders);
+      }
     });
     // No onCloseRequested handler: the store subscription above already
     // persists session.json on every relevant state change, so by the time
@@ -108,6 +116,7 @@ export default function App() {
       stopJournal();
       stopSessionWatcher();
       stopWorkspaceWatcher();
+      stopRecentWatcher();
       unlistenFocusP.then((un) => un()).catch(() => {});
     };
   }, []);
