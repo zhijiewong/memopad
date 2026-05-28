@@ -118,4 +118,43 @@ mod tests {
         assert_eq!(entries[2].is_dir, false);
         assert_eq!(entries[3].is_dir, false);
     }
+
+    #[test]
+    fn respects_gitignore() {
+        let dir = tmp("ignore");
+        std::fs::write(dir.join(".gitignore"), "target/\n").unwrap();
+        std::fs::create_dir_all(dir.join("target")).unwrap();
+        touch(&dir, "target/build.rs");
+        touch(&dir, "src.rs");
+
+        let entries = list_dir(&dir).unwrap();
+        let names: Vec<String> = entries.iter().map(|e| e.name.clone()).collect();
+        assert!(!names.contains(&"target".to_string()), "expected target/ to be filtered, got {:?}", names);
+        assert!(names.contains(&"src.rs".to_string()));
+    }
+
+    #[test]
+    fn skips_hidden_dotfiles() {
+        let dir = tmp("hidden");
+        std::fs::create_dir_all(dir.join(".git")).unwrap();
+        touch(&dir, ".env");
+        touch(&dir, "visible.txt");
+
+        let entries = list_dir(&dir).unwrap();
+        let names: Vec<String> = entries.iter().map(|e| e.name.clone()).collect();
+        assert!(!names.contains(&".git".to_string()), "expected .git to be hidden");
+        assert!(!names.contains(&".env".to_string()), "expected .env to be hidden");
+        assert!(names.contains(&"visible.txt".to_string()));
+    }
+
+    #[test]
+    fn max_depth_is_one() {
+        let dir = tmp("depth");
+        std::fs::create_dir_all(dir.join("a/b")).unwrap();
+        touch(&dir, "a/b/c.txt");
+
+        let entries = list_dir(&dir).unwrap();
+        let names: Vec<String> = entries.iter().map(|e| e.name.clone()).collect();
+        assert_eq!(names, vec!["a"]);
+    }
 }
