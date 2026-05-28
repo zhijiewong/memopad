@@ -174,4 +174,14 @@ export function registerBuiltins() {
       (window as unknown as { __memopadToggleSidebarTab?: () => void }).__memopadToggleSidebarTab?.();
     },
   });
+
+  register({
+    id: 'workspace.openRecent',
+    title: 'Open Recent Folder…',
+    shortcut: 'Ctrl+R',
+    run: () => {
+      (window as unknown as { __memopadOpenPaletteWithQuery?: (q: string) => void })
+        .__memopadOpenPaletteWithQuery?.('Open Recent: ');
+    },
+  });
 }

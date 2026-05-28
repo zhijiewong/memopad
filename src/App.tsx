@@ -128,6 +128,11 @@ export default function App() {
       const key = e.key.toLowerCase();
 
       if (key === 'b' && !e.shiftKey) { e.preventDefault(); setSidebarOpen((v) => !v); return; }
+      if (key === 'r' && !e.shiftKey) {
+        e.preventDefault();
+        runCommand('workspace.openRecent');
+        return;
+      }
       if (key === 'e' && e.shiftKey) {
         e.preventDefault();
         (window as unknown as { __memopadToggleSidebarTab?: () => void }).__memopadToggleSidebarTab?.();
