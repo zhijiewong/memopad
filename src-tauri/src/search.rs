@@ -465,4 +465,61 @@ mod tests {
         let content = std::fs::read_to_string(dir.join("a.txt")).unwrap();
         assert_eq!(content, "baz\nbar baz");
     }
+
+    #[test]
+    fn replace_preserves_encoding_utf16_le() {
+        let dir = tmp("rep_utf16");
+        let bom: [u8; 2] = [0xFF, 0xFE];
+        let mut bytes: Vec<u8> = bom.to_vec();
+        for ch in "foo".encode_utf16() {
+            bytes.extend_from_slice(&ch.to_le_bytes());
+        }
+        std::fs::write(dir.join("a.txt"), &bytes).unwrap();
+
+        let resp = replace_in_files(
+            &dir, "foo", "bar",
+            &FindOptions::default(),
+            None,
+        ).unwrap();
+        assert_eq!(resp.total_matches_replaced, 1);
+
+        let after = std::fs::read(dir.join("a.txt")).unwrap();
+        assert_eq!(&after[0..2], &[0xFF, 0xFE], "BOM should still be present");
+        let units: Vec<u16> = after[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        let decoded = String::from_utf16(&units).unwrap();
+        assert_eq!(decoded, "bar");
+    }
+
+    #[test]
+    fn replace_records_per_file_io_errors() {
+        let dir = tmp("rep_io");
+        write(&dir, "writable.txt", "foo");
+        write(&dir, "readonly.txt", "foo");
+        let ro_path = dir.join("readonly.txt");
+        let mut perms = std::fs::metadata(&ro_path).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&ro_path, perms).unwrap();
+
+        let resp = replace_in_files(
+            &dir, "foo", "bar",
+            &FindOptions::default(),
+            None,
+        ).unwrap();
+
+        let writable_entry = resp.results.iter().find(|r| r.path.ends_with("writable.txt")).unwrap();
+        let readonly_entry = resp.results.iter().find(|r| r.path.ends_with("readonly.txt")).unwrap();
+        assert_eq!(writable_entry.matches_replaced, 1);
+        assert_eq!(writable_entry.error, None);
+        assert!(readonly_entry.error.is_some(), "readonly file should record an error");
+        assert_eq!(readonly_entry.matches_replaced, 0);
+
+        // Restore writability so the tempdir can be cleaned up.
+        let mut perms = std::fs::metadata(&ro_path).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        perms.set_readonly(false);
+        let _ = std::fs::set_permissions(&ro_path, perms);
+    }
 }
