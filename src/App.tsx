@@ -208,3 +208,6 @@ export default function App() {
 (window as unknown as { __memopadTestSetWorkspace?: (folder: string) => void }).__memopadTestSetWorkspace = (folder: string) => {
   useWorkspace.getState().setFolder(folder);
 };
+(window as unknown as { __memopadTestPushRecent?: (folder: string) => void }).__memopadTestPushRecent = (folder: string) => {
+  useWorkspace.getState().pushRecentFolder(folder);
+};
