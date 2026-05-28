@@ -110,6 +110,15 @@ fn find_in_folder(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn list_dir(workspace_folder: String, path: String)
+    -> Result<Vec<files::DirEntry>, String> {
+    files::list_dir_under(
+        std::path::Path::new(&workspace_folder),
+        std::path::Path::new(&path),
+    ).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -131,6 +140,7 @@ pub fn run() {
             session_load,
             stat_file,
             find_in_folder,
+            list_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
