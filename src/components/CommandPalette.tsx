@@ -4,10 +4,11 @@ import { search, type SearchMatch } from '../commands/registry';
 interface Props {
   onClose: () => void;
   onRun: (id: string) => void;
+  initialQuery?: string;
 }
 
-export function CommandPalette({ onClose, onRun }: Props) {
-  const [query, setQuery] = useState('');
+export function CommandPalette({ onClose, onRun, initialQuery = '' }: Props) {
+  const [query, setQuery] = useState(initialQuery);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 

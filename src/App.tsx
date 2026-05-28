@@ -72,6 +72,7 @@ async function rescanExternalChanges() {
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [presetQuery, setPresetQuery] = useState('');
 
   const themeMode = useTheme((s) => s.mode);
   useEffect(() => {
@@ -118,6 +119,10 @@ export default function App() {
       requestAnimationFrame(() => {
         (window as unknown as { __memopadFocusFindInFiles?: () => void }).__memopadFocusFindInFiles?.();
       });
+    };
+    (window as unknown as { __memopadOpenPaletteWithQuery?: (q: string) => void }).__memopadOpenPaletteWithQuery = (q: string) => {
+      setPresetQuery(q);
+      setPaletteOpen(true);
     };
   }, []);
 
@@ -179,7 +184,13 @@ export default function App() {
         </div>
       </main>
       <StatusBar />
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} onRun={runCommand} />}
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => { setPaletteOpen(false); setPresetQuery(''); }}
+          onRun={runCommand}
+          initialQuery={presetQuery}
+        />
+      )}
     </div>
   );
 }
