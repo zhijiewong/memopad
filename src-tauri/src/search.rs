@@ -60,6 +60,125 @@ impl From<std::io::Error> for FindError {
     fn from(e: std::io::Error) -> Self { FindError::Io(e) }
 }
 
+// ── Replace types ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileResult {
+    pub path: String,
+    pub matches_replaced: u32,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplaceResponse {
+    pub results: Vec<FileResult>,
+    pub total_files_replaced: u32,
+    pub total_matches_replaced: u32,
+}
+
+// ── Shared helpers ──────────────────────────────────────────────────────────
+
+fn build_matcher_pattern(query: &str, opts: &FindOptions) -> String {
+    let pattern = if opts.regex { query.to_string() } else { regex::escape(query) };
+    if opts.whole_word { format!(r"\b(?:{})\b", pattern) } else { pattern }
+}
+
+pub fn replace_in_files(
+    folder: &Path,
+    query: &str,
+    replacement: &str,
+    opts: &FindOptions,
+    target_paths: Option<&[String]>,
+) -> Result<ReplaceResponse, FindError> {
+    use ignore::WalkBuilder;
+    use regex::RegexBuilder;
+
+    if !folder.exists() {
+        return Err(FindError::WorkspaceMissing);
+    }
+
+    let pattern = build_matcher_pattern(query, opts);
+    let re = RegexBuilder::new(&pattern)
+        .case_insensitive(!opts.case_sensitive)
+        .build()
+        .map_err(|e| FindError::InvalidRegex(e.to_string()))?;
+
+    let files: Vec<std::path::PathBuf> = match target_paths {
+        Some(paths) => paths.iter().map(std::path::PathBuf::from).collect(),
+        None => {
+            let mut out = Vec::new();
+            let mut walker = WalkBuilder::new(folder);
+            walker.standard_filters(true);
+            walker.require_git(false);
+            for entry in walker.build() {
+                let entry = match entry { Ok(e) => e, Err(_) => continue };
+                if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) { continue; }
+                out.push(entry.into_path());
+            }
+            out
+        }
+    };
+
+    let mut results: Vec<FileResult> = Vec::with_capacity(files.len());
+    let mut total_files: u32 = 0;
+    let mut total_matches: u32 = 0;
+
+    for path in files {
+        let path_str = path.to_string_lossy().to_string();
+
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(e) => {
+                results.push(FileResult { path: path_str, matches_replaced: 0, error: Some(e.to_string()) });
+                continue;
+            }
+        };
+        let (encoding, _bom_offset) = crate::fs::detect_encoding(&bytes);
+        let text = crate::fs::decode_bytes(&bytes, encoding);
+
+        let match_count = re.find_iter(&text).count() as u32;
+        if match_count == 0 {
+            results.push(FileResult { path: path_str, matches_replaced: 0, error: None });
+            continue;
+        }
+        let new_text = re.replace_all(&text, replacement).into_owned();
+
+        let new_bytes = crate::fs::encode_string(&new_text, encoding);
+        let tmp_path = {
+            let mut t = path.clone();
+            let mut new_name = t.file_name().unwrap_or_default().to_os_string();
+            new_name.push(".tmp");
+            t.set_file_name(new_name);
+            t
+        };
+        let write_result = (|| -> std::io::Result<()> {
+            use std::io::Write;
+            let mut f = std::fs::File::create(&tmp_path)?;
+            f.write_all(&new_bytes)?;
+            f.sync_all()?;
+            std::fs::rename(&tmp_path, &path)?;
+            Ok(())
+        })();
+
+        match write_result {
+            Ok(()) => {
+                results.push(FileResult { path: path_str, matches_replaced: match_count, error: None });
+                total_files += 1;
+                total_matches += match_count;
+            }
+            Err(e) => {
+                results.push(FileResult { path: path_str, matches_replaced: 0, error: Some(e.to_string()) });
+            }
+        }
+    }
+
+    Ok(ReplaceResponse {
+        results,
+        total_files_replaced: total_files,
+        total_matches_replaced: total_matches,
+    })
+}
+
 pub fn find_in_folder(
     folder: &Path,
     query: &str,
@@ -324,5 +443,26 @@ mod tests {
             FindError::WorkspaceMissing => {}
             other => panic!("expected WorkspaceMissing, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn replace_literal_replaces_all_matches_in_a_file() {
+        let dir = tmp("rep_literal");
+        write(&dir, "a.txt", "foo\nbar foo");
+
+        let resp = replace_in_files(
+            &dir, "foo", "baz",
+            &FindOptions::default(),
+            None,
+        ).unwrap();
+
+        assert_eq!(resp.total_files_replaced, 1);
+        assert_eq!(resp.total_matches_replaced, 2);
+        assert_eq!(resp.results.len(), 1);
+        assert_eq!(resp.results[0].matches_replaced, 2);
+        assert_eq!(resp.results[0].error, None);
+
+        let content = std::fs::read_to_string(dir.join("a.txt")).unwrap();
+        assert_eq!(content, "baz\nbar baz");
     }
 }
