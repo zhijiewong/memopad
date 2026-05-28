@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCommands, search } from '../commands/registry';
+import { registerRecentFolderCommands } from '../commands/builtins';
 
 describe('command registry', () => {
   beforeEach(() => useCommands.getState().reset());
@@ -52,5 +53,23 @@ describe('command registry', () => {
     expect(ids[1]).to.equal('b');
     // c (never used) comes after the recent ones; order among never-used items is registration order.
     expect(ids[2]).to.equal('c');
+  });
+});
+
+describe('registerRecentFolderCommands', () => {
+  it('replaces previous workspace.recent.* entries', () => {
+    const initialCount = useCommands.getState().commands.length;
+    // Pre-seed stale recent commands.
+    useCommands.getState().register({ id: 'workspace.recent.0', title: 'Old', run: () => {} });
+    useCommands.getState().register({ id: 'workspace.recent.1', title: 'Older', run: () => {} });
+
+    registerRecentFolderCommands(['C:/proj/foo', 'C:/proj/bar']);
+
+    const final = useCommands.getState().commands;
+    const recents = final.filter((c) => c.id.startsWith('workspace.recent.'));
+    expect(recents.length).toBe(2);
+    expect(recents.map((r) => r.title).sort()).toEqual(['Open Recent: bar', 'Open Recent: foo']);
+    // Non-recent commands intact:
+    expect(final.length).toBeGreaterThanOrEqual(initialCount);
   });
 });
