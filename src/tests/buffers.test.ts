@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useBuffers } from '../stores/buffers';
+import { useBuffers, selectPaneState } from '../stores/buffers';
 
 describe('buffers store', () => {
   beforeEach(() => {
@@ -388,5 +388,52 @@ describe('reloadIfOpen', () => {
     const buf = useBuffers.getState().buffers.find((b) => b.id === id);
     expect(buf?.content).toBe('EDITED');
     spy.mockRestore();
+  });
+});
+
+describe('per-pane cursor + scroll', () => {
+  beforeEach(() => {
+    useBuffers.setState(useBuffers.getInitialState(), true);
+  });
+
+  it('setSecondaryCursor isolates secondary from primary', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: 'C:/a.txt', content: 'hello\nworld', encoding: 'utf-8', eol: 'lf',
+    });
+    useBuffers.getState().setCursor(id, 10);
+    useBuffers.getState().setSecondaryCursor(id, 50);
+
+    expect(selectPaneState(useBuffers.getState(), 'primary', id).cursor).toBe(10);
+    expect(selectPaneState(useBuffers.getState(), 'secondary', id).cursor).toBe(50);
+  });
+
+  it('setSecondaryScrollTop isolates secondary from primary', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: 'C:/a.txt', content: 'hi', encoding: 'utf-8', eol: 'lf',
+    });
+    useBuffers.getState().setScrollTop(id, 100);
+    useBuffers.getState().setSecondaryScrollTop(id, 300);
+
+    expect(selectPaneState(useBuffers.getState(), 'primary', id).scrollTop).toBe(100);
+    expect(selectPaneState(useBuffers.getState(), 'secondary', id).scrollTop).toBe(300);
+  });
+
+  it('selectPaneState secondary falls back to primary when no entry exists', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: 'C:/a.txt', content: 'x', encoding: 'utf-8', eol: 'lf',
+    });
+    useBuffers.getState().setCursor(id, 20);
+    expect(selectPaneState(useBuffers.getState(), 'secondary', id).cursor).toBe(20);
+  });
+
+  it('closeBuffer clears secondary pane state for the closed buffer', () => {
+    const id = useBuffers.getState().openBuffer({
+      path: 'C:/a.txt', content: 'x', encoding: 'utf-8', eol: 'lf',
+    });
+    useBuffers.getState().setSecondaryCursor(id, 42);
+    expect(useBuffers.getState().secondaryPaneState.has(id)).toBe(true);
+
+    useBuffers.getState().closeBuffer(id);
+    expect(useBuffers.getState().secondaryPaneState.has(id)).toBe(false);
   });
 });

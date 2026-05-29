@@ -11,7 +11,7 @@ import {
   getSearchQuery,
   search,
 } from '@codemirror/search';
-import { useBuffers } from '../stores/buffers';
+import { useBuffers, selectPaneState } from '../stores/buffers';
 import { languageForPath } from '../lib/language';
 import { useTheme, effectiveTheme } from '../stores/theme';
 import { memopadDark } from '../editor/memopad-dark';
@@ -47,6 +47,7 @@ declare global {
 export interface EditorPaneProps {
   bufferId: string | null;
   focused: boolean;
+  pane: 'primary' | 'secondary';
   onFocus: () => void;
   onActionsReady: (actions: SearchStripActions | null) => void;
   /** Called by the focused pane to open/close the search panel in the orchestrator. */
@@ -60,6 +61,8 @@ export function EditorPane(props: EditorPaneProps) {
   const buffer = useBuffers((s) =>
     props.bufferId == null ? null : s.buffers.find((b) => b.id === props.bufferId) ?? null
   );
+  const cursor = useBuffers((s) => selectPaneState(s, props.pane, props.bufferId).cursor);
+  const scrollTop = useBuffers((s) => selectPaneState(s, props.pane, props.bufferId).scrollTop);
   const setActiveContent = useBuffers((s) => s.setActiveContent);
   const themeMode = useTheme((s) => s.mode);
   const themeExt = effectiveTheme(themeMode) === 'dark' ? memopadDark : memopadLight;
@@ -89,10 +92,15 @@ export function EditorPane(props: EditorPaneProps) {
     if (!buffer) return;
     if (cursorWriteTimer.current) clearTimeout(cursorWriteTimer.current);
     cursorWriteTimer.current = setTimeout(() => {
-      useBuffers.getState().setCursor(buffer.id, nextCursor);
-      useBuffers.getState().setScrollTop(buffer.id, nextScrollTop);
+      if (props.pane === 'primary') {
+        useBuffers.getState().setCursor(buffer.id, nextCursor);
+        useBuffers.getState().setScrollTop(buffer.id, nextScrollTop);
+      } else {
+        useBuffers.getState().setSecondaryCursor(buffer.id, nextCursor);
+        useBuffers.getState().setSecondaryScrollTop(buffer.id, nextScrollTop);
+      }
     }, 150);
-  }, [buffer]);
+  }, [buffer, props.pane]);
 
   const getActions = useCallback((): SearchStripActions => ({
     findNext: () => {
@@ -224,14 +232,14 @@ export function EditorPane(props: EditorPaneProps) {
           onChange={setActiveContent}
           onCreateEditor={(view) => {
             viewRef.current = view;
-            if (buffer && buffer.cursor != null) {
+            if (buffer && cursor != null) {
               const docLen = view.state.doc.length;
-              const safe = Math.min(buffer.cursor, docLen);
+              const safe = Math.min(cursor, docLen);
               view.dispatch({ selection: { anchor: safe, head: safe } });
             }
-            if (buffer && buffer.scrollTop != null) {
+            if (buffer && scrollTop != null) {
               requestAnimationFrame(() => {
-                view.scrollDOM.scrollTop = buffer.scrollTop ?? 0;
+                view.scrollDOM.scrollTop = scrollTop ?? 0;
               });
             }
           }}
