@@ -438,7 +438,7 @@ describe('per-pane cursor + scroll', () => {
   });
 });
 
-describe('restoreSplitState', () => {
+describe('openRestored cursor/scroll', () => {
   beforeEach(() => {
     useBuffers.setState(useBuffers.getInitialState(), true);
   });
@@ -472,6 +472,12 @@ describe('restoreSplitState', () => {
     expect(buf?.cursor).toBeNull();
     expect(buf?.scrollTop).toBeNull();
   });
+});
+
+describe('restoreSplitState', () => {
+  beforeEach(() => {
+    useBuffers.setState(useBuffers.getInitialState(), true);
+  });
 
   it('opens the split when secondaryId resolves to a live buffer', () => {
     useBuffers.getState().openRestored({
@@ -481,7 +487,7 @@ describe('restoreSplitState', () => {
       bufferId: 'b2', path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
     });
     useBuffers.getState().restoreSplitState({
-      active: true,
+      splitActive: true,
       secondaryId: 'b2',
       focusedPane: 'secondary',
       secondaryPaneState: [{ bufferId: 'b2', cursor: 3, scrollTop: 50 }],
@@ -498,7 +504,7 @@ describe('restoreSplitState', () => {
       bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
     });
     useBuffers.getState().restoreSplitState({
-      active: true,
+      splitActive: true,
       secondaryId: 'gone',
       focusedPane: 'secondary',
       secondaryPaneState: [],
@@ -511,7 +517,7 @@ describe('restoreSplitState', () => {
 
   it('forces focusedPane to primary when collapsing', () => {
     useBuffers.getState().restoreSplitState({
-      active: false,
+      splitActive: false,
       secondaryId: null,
       focusedPane: 'secondary',
       secondaryPaneState: [],
@@ -527,7 +533,7 @@ describe('restoreSplitState', () => {
       bufferId: 'b2', path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
     });
     useBuffers.getState().restoreSplitState({
-      active: true,
+      splitActive: true,
       secondaryId: 'b2',
       focusedPane: 'secondary',
       secondaryPaneState: [

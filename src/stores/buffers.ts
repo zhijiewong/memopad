@@ -47,6 +47,13 @@ export interface ReplaceBufferInput {
   eol: LineEnding;
 }
 
+export interface RestoreSplitInput {
+  splitActive: boolean;
+  secondaryId: string | null;
+  focusedPane: 'primary' | 'secondary';
+  secondaryPaneState: Array<{ bufferId: string; cursor: number | null; scrollTop: number | null }>;
+}
+
 interface BuffersState {
   buffers: Buffer[];
   activeId: string | null;
@@ -62,12 +69,7 @@ interface BuffersState {
   closeBuffer: (id: string) => void;
   switchTo: (id: string) => void;
   toggleSplit: () => void;
-  restoreSplitState: (input: {
-    active: boolean;
-    secondaryId: string | null;
-    focusedPane: 'primary' | 'secondary';
-    secondaryPaneState: Array<{ bufferId: string; cursor: number | null; scrollTop: number | null }>;
-  }) => void;
+  restoreSplitState: (input: RestoreSplitInput) => void;
   setFocusedPane: (p: 'primary' | 'secondary') => void;
   setFocusedBuffer: (id: string) => void;
   setActiveContent: (next: string) => void;
@@ -217,7 +219,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
           nextPaneState.set(entry.bufferId, { cursor: entry.cursor, scrollTop: entry.scrollTop });
         }
       }
-      if (input.active && exists(input.secondaryId)) {
+      if (input.splitActive && exists(input.secondaryId)) {
         return {
           splitActive: true,
           secondaryId: input.secondaryId,
