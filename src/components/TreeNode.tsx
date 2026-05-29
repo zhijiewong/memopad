@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { useWorkspace } from '../stores/workspace';
 import { useBuffers } from '../stores/buffers';
-import { openFile as openFileIpc, type DirEntry } from '../lib/tauri';
+import { openFile as openFileIpc, type DirEntry, revealInExplorer } from '../lib/tauri';
+import { TabContextMenu, type TabContextMenuItem } from './TabContextMenu';
+import { relativeToWorkspace } from '../lib/path';
 
 interface Props {
   entry: DirEntry;
@@ -12,6 +15,8 @@ export function TreeNode({ entry, depth }: Props) {
   const childrenByPath = useWorkspace((s) => s.childrenByPath);
   const loadingByPath = useWorkspace((s) => s.loadingByPath);
   const toggleExpand = useWorkspace((s) => s.toggleExpand);
+
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
 
   const isOpen = expanded.has(entry.path);
   const kids = childrenByPath.get(entry.path);
@@ -35,6 +40,30 @@ export function TreeNode({ entry, depth }: Props) {
     }
   };
 
+  function buildMenuItems(path: string): TabContextMenuItem[] {
+    const workspaceFolder = useWorkspace.getState().workspaceFolder ?? '';
+    return [
+      {
+        label: 'Reveal in Explorer',
+        enabled: true,
+        onClick: () => { revealInExplorer(path).catch((err) => console.error('reveal:', err)); },
+      },
+      {
+        label: 'Copy Path',
+        enabled: true,
+        onClick: () => { navigator.clipboard.writeText(path).catch((err) => console.error('clipboard:', err)); },
+      },
+      {
+        label: 'Copy Relative Path',
+        enabled: workspaceFolder !== '',
+        onClick: () => {
+          const rel = relativeToWorkspace(path, workspaceFolder);
+          navigator.clipboard.writeText(rel).catch((err) => console.error('clipboard:', err));
+        },
+      },
+    ];
+  }
+
   return (
     <>
       <button
@@ -43,6 +72,7 @@ export function TreeNode({ entry, depth }: Props) {
         data-depth={depth}
         data-is-dir={entry.is_dir}
         onClick={onClick}
+        onContextMenu={(e) => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); }}
         title={entry.path}
         className="block w-full cursor-pointer truncate text-left text-xs text-neutral-300 hover:bg-neutral-800"
         style={{ paddingLeft: `${depth * 12 + 6}px`, paddingTop: 2, paddingBottom: 2 }}
@@ -70,6 +100,14 @@ export function TreeNode({ entry, depth }: Props) {
             <TreeNode key={k.path} entry={k} depth={depth + 1} />
           ))}
         </>
+      )}
+      {menuPos && (
+        <TabContextMenu
+          x={menuPos.x}
+          y={menuPos.y}
+          items={buildMenuItems(entry.path)}
+          onClose={() => setMenuPos(null)}
+        />
       )}
     </>
   );
