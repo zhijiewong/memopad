@@ -137,12 +137,27 @@ fn replace_in_files(
     ).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn watch_start(
+    folder: String,
+    handle: tauri::State<watcher::WatcherHandle>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    watcher::start(&handle, std::path::PathBuf::from(&folder), app)
+}
+
+#[tauri::command]
+fn watch_stop(handle: tauri::State<watcher::WatcherHandle>) -> Result<(), String> {
+    watcher::stop(&handle)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(watcher::WatcherHandle(std::sync::Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             window_minimize,
             window_toggle_maximize,
@@ -160,6 +175,8 @@ pub fn run() {
             find_in_folder,
             list_dir,
             replace_in_files,
+            watch_start,
+            watch_stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
