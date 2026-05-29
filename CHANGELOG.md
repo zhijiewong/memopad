@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-29
+
+Ten v2 slices over four sessions. v2's theme is the workspace folder: every new feature operates over a persistent root opened with `Ctrl+K Ctrl+O`. Backward-compatible with v0.1.0 session.json files.
+
+### Added
+
+- **Find in files** (`Ctrl+Shift+F`) — project-wide search via ripgrep crates, sidebar results panel, click-to-jump
+- **File tree sidebar** with lazy expand-on-click; respects `.gitignore`
+- **Replace in files** with confirm dialog, dirty-buffer block, per-file outcome list; preview expands regex backreferences (`$1`, `$&`)
+- **Recent folders** list (`Ctrl+R`) — last 10 opened folders surfaced as palette entries; persisted across sessions
+- **fs watcher** (notify-debouncer-full) — file tree auto-refreshes; external-change banner triggers without window refocus
+- **File tree right-click menu** — Reveal in Explorer, Copy Path, Copy Relative Path
+- **Split view** (`Ctrl+\`) — two horizontal panes; tab strip + commands target the focused pane
+- **Per-pane cursor + scroll** — each pane remembers its own viewport for the same buffer
+- **Quick open by filename** (`Ctrl+P`) — fuzzy match across all workspace files with recent-file boost
+- **Sidebar toggle** (`Ctrl+B`) + tab cycle (`Ctrl+Shift+E`)
+- **Backref-aware replace preview** in the Search panel
+
+### Changed
+
+- The command palette is now `Ctrl+Shift+P` only (was also `Ctrl+P`). `Ctrl+P` now opens Quick Open.
+- `SessionState` JSON schema gained `workspace_folder` + `recent_folders` (both `#[serde(default)]`); old session.json files load unchanged.
+
+### Known limitations (carried over from v0.1.0)
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- No file create / rename / delete in the tree (still read-only)
+- Split view is two panes max, horizontal only; not persisted across relaunch
+- fs watcher watches the workspace folder only — open files outside still rely on focus-based rescan
+
 ## [0.1.0] — 2026-05-27
 
 The first public release. Six implementation phases over the v1 plan.

@@ -15,15 +15,27 @@ A trim, modern alternative to Notepad++ that does two things noticeably better:
 
 ## Features
 
+### Editing
 - Multi-buffer editing with drag-reorderable tabs in the title bar
 - Syntax highlighting for Rust, JavaScript / TypeScript, JSON, Markdown
 - Inline find / replace with regex (`Ctrl+F` / `Ctrl+H`)
-- Command palette (`Ctrl+K`) — every action reachable by keyboard
+- Split view (`Ctrl+\`) — two horizontal panes with per-pane cursor + scroll
 - Memopad Dark + Memopad Light themes, follow system preference by default
-- Bulletproof crash recovery — journal-backed dirty buffer restoration
-- Session restore — reopen the same tabs on relaunch
-- External-change detection with Reload / Keep mine / Diff view
 - Encoding-aware (UTF-8, UTF-8 BOM, UTF-16 LE/BE) with round-trip preservation
+
+### Workspace (v0.2)
+- Open a folder once (`Ctrl+K Ctrl+O`); recent folders list (`Ctrl+R`)
+- File tree sidebar (`Ctrl+B`) with lazy expand + right-click context menu
+- Find in files (`Ctrl+Shift+F`) — ripgrep-powered, click-to-jump
+- Replace in files with confirm dialog, dirty-buffer block, backref-aware preview
+- Quick open by filename (`Ctrl+P`) — fuzzy match across the workspace
+- Live filesystem watcher — tree auto-refreshes and external-change banner fires without refocusing
+
+### Reliability
+- Command palette (`Ctrl+Shift+P`) — every action reachable by keyboard
+- Bulletproof crash recovery — journal-backed dirty buffer restoration
+- Session restore — reopen the same tabs (and workspace folder) on relaunch
+- External-change detection with Reload / Keep mine / Diff view
 - Auto-update via GitHub Releases
 
 ## Install
@@ -42,15 +54,22 @@ To uninstall: Settings → Apps → Memopad → Uninstall.
 | Action | Shortcut |
 | --- | --- |
 | Command palette | `Ctrl+K` or `Ctrl+Shift+P` |
+| Quick open by filename | `Ctrl+P` |
 | Open file | `Ctrl+O` |
+| Open folder | `Ctrl+K Ctrl+O` |
+| Open recent folder | `Ctrl+R` |
 | Save | `Ctrl+S` |
 | Save as | `Ctrl+Shift+S` |
 | New tab | `Ctrl+N` |
 | Close tab | `Ctrl+W` |
 | Reopen closed tab | `Ctrl+Shift+T` |
 | Next / Previous tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| Find | `Ctrl+F` |
-| Replace | `Ctrl+H` |
+| Find in buffer | `Ctrl+F` |
+| Replace in buffer | `Ctrl+H` |
+| Find in files (sidebar) | `Ctrl+Shift+F` |
+| Toggle sidebar | `Ctrl+B` |
+| Toggle Files / Search tab | `Ctrl+Shift+E` |
+| Toggle split view | `Ctrl+\` |
 
 All shortcuts are also reachable through the command palette.
 
