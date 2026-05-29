@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useBuffers } from '../stores/buffers';
+import { useBuffers, selectFocusedId } from '../stores/buffers';
 import { TabContextMenu } from './TabContextMenu';
 import { revealInExplorer } from '../lib/tauri';
 
@@ -11,8 +11,8 @@ function fileNameOf(path: string | null, untitledIndex: number): string {
 
 export function TabStrip() {
   const buffers = useBuffers((s) => s.buffers);
-  const activeId = useBuffers((s) => s.activeId);
-  const switchTo = useBuffers((s) => s.switchTo);
+  const focusedId = useBuffers((s) => selectFocusedId(s));
+  const setFocusedBuffer = useBuffers((s) => s.setFocusedBuffer);
   const closeBuffer = useBuffers((s) => s.closeBuffer);
   const reorderBuffer = useBuffers((s) => s.reorderBuffer);
 
@@ -50,7 +50,7 @@ export function TabStrip() {
     <>
       <div className="flex h-full items-stretch overflow-x-auto">
         {buffers.map((b, idx) => {
-          const isActive = b.id === activeId;
+          const isActive = b.id === focusedId;
           const isUntitled = b.path === null;
           const fileIdx = isUntitled ? ++untitledCounter : 0;
           const name = fileNameOf(b.path, fileIdx);
@@ -79,7 +79,7 @@ export function TabStrip() {
                 setDragId(null);
               }}
               onDragEnd={() => setDragId(null)}
-              onClick={() => switchTo(b.id)}
+              onClick={() => setFocusedBuffer(b.id)}
               onMouseDown={(e) => {
                 if (e.button === 1) {
                   e.preventDefault();
