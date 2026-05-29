@@ -11,6 +11,7 @@ import { useBuffers } from './stores/buffers';
 import { useTheme, effectiveTheme } from './stores/theme';
 import { useWorkspace } from './stores/workspace';
 import { startJournalDebounce } from './lib/journal-debounce';
+import { startFsWatcher, stopFsWatcher } from './lib/fs-watcher';
 import { bootRestore } from './lib/boot';
 import { statFile } from './lib/tauri';
 import { scheduleSessionSave } from './lib/session-debounce';
@@ -102,6 +103,17 @@ export default function App() {
         registerRecentFolderCommands(state.recentFolders);
       }
     });
+    const stopWatcherSync = useWorkspace.subscribe((state, prev) => {
+      if (state.workspaceFolder !== prev.workspaceFolder) {
+        if (state.workspaceFolder) {
+          startFsWatcher(state.workspaceFolder).catch((err) =>
+            console.warn('fs watcher start failed:', err)
+          );
+        } else {
+          stopFsWatcher().catch(() => {});
+        }
+      }
+    });
     // No onCloseRequested handler: the store subscription above already
     // persists session.json on every relevant state change, so by the time
     // the user clicks X the file is up to date. Registering a handler at
@@ -117,6 +129,8 @@ export default function App() {
       stopSessionWatcher();
       stopWorkspaceWatcher();
       stopRecentWatcher();
+      stopWatcherSync();
+      stopFsWatcher().catch(() => {});
       unlistenFocusP.then((un) => un()).catch(() => {});
     };
   }, []);
