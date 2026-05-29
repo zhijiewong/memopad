@@ -346,6 +346,27 @@ describe('split view', () => {
     useBuffers.getState().closeBuffer(bId);
     expect(useBuffers.getState().secondaryId).toBe(aId);
   });
+
+  it('resetAll clears split state', () => {
+    useBuffers.getState().openRestored({
+      bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().openRestored({
+      bufferId: 'b2', path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().restoreSplitState({
+      splitActive: true,
+      secondaryId: 'b2',
+      focusedPane: 'secondary',
+      secondaryPaneState: [{ bufferId: 'b2', cursor: 1, scrollTop: 2 }],
+    });
+    useBuffers.getState().resetAll();
+    const s = useBuffers.getState();
+    expect(s.splitActive).toBe(false);
+    expect(s.secondaryId).toBeNull();
+    expect(s.focusedPane).toBe('primary');
+    expect(s.secondaryPaneState.size).toBe(0);
+  });
 });
 
 describe('reloadIfOpen', () => {

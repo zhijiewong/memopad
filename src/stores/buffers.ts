@@ -402,7 +402,15 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   },
 
   resetAll: () => {
-    set({ buffers: [], activeId: null, recentlyClosed: [] });
+    set({
+      buffers: [],
+      activeId: null,
+      recentlyClosed: [],
+      splitActive: false,
+      secondaryId: null,
+      focusedPane: 'primary',
+      secondaryPaneState: new Map(),
+    });
   },
 
   openFileAtLine(path, line, range, _snippet) {
