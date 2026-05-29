@@ -4,6 +4,7 @@ import { openFile as openFileIpc } from '../lib/tauri';
 import { useBuffers } from '../stores/buffers';
 import type { FindOptions, FindResponse, FileMatch, LineMatch } from '../lib/tauri';
 import { ReplaceConfirmDialog } from './ReplaceConfirmDialog';
+import { expandBackrefs } from '../lib/replace-preview';
 
 const DEBOUNCE_MS = 200;
 
@@ -93,6 +94,7 @@ export function SearchPanel() {
         inFlight={inFlight}
         results={results}
         replacement={replace}
+        query={query}
         opts={opts}
         showReplaceUI={replaceVisible}
         onReplaceClick={() => setDialogOpen(true)}
@@ -126,11 +128,12 @@ function Toggle({ label, title, active, onClick }: { label: string; title: strin
 }
 
 function ResultsBody({
-  inFlight, results, replacement, opts, showReplaceUI, onReplaceClick,
+  inFlight, results, replacement, query, opts, showReplaceUI, onReplaceClick,
 }: {
   inFlight: boolean;
   results: FindResponse | null;
   replacement: string;
+  query: string;
   opts: FindOptions;
   showReplaceUI: boolean;
   onReplaceClick: () => void;
@@ -150,6 +153,7 @@ function ResultsBody({
             key={f.path}
             file={f}
             replacement={showReplaceUI ? replacement : undefined}
+            query={query}
             opts={opts}
           />
         ))}
@@ -180,9 +184,10 @@ function ResultsBody({
   );
 }
 
-function FileGroup({ file, replacement, opts }: {
+function FileGroup({ file, replacement, query, opts }: {
   file: FileMatch;
   replacement?: string;
+  query: string;
   opts: FindOptions;
 }) {
   const short = file.path.split(/[/\\]/).pop() ?? file.path;
@@ -192,7 +197,7 @@ function FileGroup({ file, replacement, opts }: {
       <ul>
         {file.matches.map((m, i) => (
           <li key={i}>
-            <ResultRow path={file.path} match={m} replacement={replacement} opts={opts} />
+            <ResultRow path={file.path} match={m} replacement={replacement} query={query} opts={opts} />
           </li>
         ))}
       </ul>
@@ -200,10 +205,11 @@ function FileGroup({ file, replacement, opts }: {
   );
 }
 
-function ResultRow({ path, match, replacement, opts: _opts }: {
+function ResultRow({ path, match, replacement, query, opts }: {
   path: string;
   match: LineMatch;
   replacement?: string;
+  query: string;
   opts: FindOptions;
 }) {
   return (
@@ -225,15 +231,17 @@ function ResultRow({ path, match, replacement, opts: _opts }: {
       title={match.line_text}
     >
       <span className="mr-2 text-neutral-500">{match.line_number}:</span>
-      <Snippet text={match.line_text} ranges={match.match_ranges} replacement={replacement} />
+      <Snippet text={match.line_text} ranges={match.match_ranges} replacement={replacement} query={query} opts={opts} />
     </button>
   );
 }
 
-function Snippet({ text, ranges, replacement }: {
+function Snippet({ text, ranges, replacement, query, opts }: {
   text: string;
   ranges: [number, number][];
   replacement?: string;
+  query: string;
+  opts: FindOptions;
 }) {
   if (ranges.length === 0) return <span>{text}</span>;
   const parts: import('react').ReactNode[] = [];
@@ -242,8 +250,9 @@ function Snippet({ text, ranges, replacement }: {
     if (s > cursor) parts.push(<span key={`p${i}`}>{text.slice(cursor, s)}</span>);
     const oldSpan = text.slice(s, e);
     if (typeof replacement === 'string') {
+      const newSpan = expandBackrefs(oldSpan, query, replacement, opts);
       parts.push(<s key={`o${i}`} className="text-neutral-500">{oldSpan}</s>);
-      parts.push(<mark key={`n${i}`} className="bg-emerald-500/30 text-emerald-200">{replacement}</mark>);
+      parts.push(<mark key={`n${i}`} className="bg-emerald-500/30 text-emerald-200">{newSpan}</mark>);
     } else {
       parts.push(<mark key={`m${i}`} className="bg-amber-400/30 text-amber-200">{oldSpan}</mark>);
     }
