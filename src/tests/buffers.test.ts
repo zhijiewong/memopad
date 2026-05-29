@@ -266,6 +266,88 @@ describe('openFileAtLine', () => {
   });
 });
 
+describe('split view', () => {
+  beforeEach(() => {
+    useBuffers.setState(useBuffers.getInitialState(), true);
+  });
+
+  it('toggleSplit enables split with secondary mirroring primary and focuses secondary', () => {
+    useBuffers.setState({
+      buffers: [],
+      activeId: null,
+      recentlyClosed: [],
+      splitActive: false,
+      secondaryId: null,
+      focusedPane: 'primary',
+    } as never);
+    const id = useBuffers.getState().newBuffer();
+    useBuffers.getState().toggleSplit();
+    expect(useBuffers.getState().splitActive).toBe(true);
+    expect(useBuffers.getState().secondaryId).toBe(id);
+    expect(useBuffers.getState().focusedPane).toBe('secondary');
+  });
+
+  it('toggleSplit disables split and focuses primary', () => {
+    useBuffers.setState({
+      buffers: [],
+      activeId: 'b1',
+      recentlyClosed: [],
+      splitActive: true,
+      secondaryId: 'b1',
+      focusedPane: 'secondary',
+    } as never);
+    useBuffers.getState().toggleSplit();
+    expect(useBuffers.getState().splitActive).toBe(false);
+    expect(useBuffers.getState().secondaryId).toBeNull();
+    expect(useBuffers.getState().focusedPane).toBe('primary');
+  });
+
+  it('setFocusedBuffer with primary focus updates activeId', () => {
+    useBuffers.setState({
+      buffers: [],
+      activeId: 'b1',
+      recentlyClosed: [],
+      splitActive: true,
+      secondaryId: 'b2',
+      focusedPane: 'primary',
+    } as never);
+    useBuffers.getState().setFocusedBuffer('b3');
+    expect(useBuffers.getState().activeId).toBe('b3');
+    expect(useBuffers.getState().secondaryId).toBe('b2');
+  });
+
+  it('setFocusedBuffer with secondary focus updates secondaryId', () => {
+    useBuffers.setState({
+      buffers: [],
+      activeId: 'b1',
+      recentlyClosed: [],
+      splitActive: true,
+      secondaryId: 'b2',
+      focusedPane: 'secondary',
+    } as never);
+    useBuffers.getState().setFocusedBuffer('b3');
+    expect(useBuffers.getState().activeId).toBe('b1');
+    expect(useBuffers.getState().secondaryId).toBe('b3');
+  });
+
+  it('closeBuffer secondary falls back to primary', () => {
+    const aId = useBuffers.getState().openBuffer({
+      path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf',
+    });
+    const bId = useBuffers.getState().openBuffer({
+      path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf',
+    });
+    useBuffers.setState({
+      activeId: aId,
+      splitActive: true,
+      secondaryId: bId,
+      focusedPane: 'secondary',
+    } as never);
+    useBuffers.getState().closeBuffer(bId);
+    expect(useBuffers.getState().secondaryId).toBe(aId);
+  });
+});
+
 describe('reloadIfOpen', () => {
   it('replaces content and preserves id', async () => {
     vi.resetModules();
