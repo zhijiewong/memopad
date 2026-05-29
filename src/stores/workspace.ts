@@ -19,6 +19,9 @@ interface WorkspaceState {
 
   recentFolders: string[];
 
+  watcherError: string | null;
+  setWatcherError: (msg: string | null) => void;
+
   pushRecentFolder: (path: string) => void;
   removeRecentFolder: (path: string) => void;
   setRecent: (list: string[]) => void;
@@ -46,6 +49,11 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   childrenByPath: new Map<string, DirEntry[]>(),
   loadingByPath: new Set<string>(),
   recentFolders: [],
+  watcherError: null,
+
+  setWatcherError(msg) {
+    set({ watcherError: msg });
+  },
 
   async openFolder() {
     const picked = await openDialog({ directory: true, multiple: false });

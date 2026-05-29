@@ -8,6 +8,7 @@ export function FileTreePanel() {
   const loadingByPath = useWorkspace((s) => s.loadingByPath);
   const toggleExpand = useWorkspace((s) => s.toggleExpand);
   const refreshSubtree = useWorkspace((s) => s.refreshSubtree);
+  const watcherError = useWorkspace((s) => s.watcherError);
 
   useEffect(() => {
     if (!folder) return;
@@ -34,6 +35,16 @@ export function FileTreePanel() {
           className="rounded px-1 text-neutral-500 hover:text-neutral-200"
         >↻</button>
       </div>
+      {watcherError && (
+        <div data-testid="fs-watcher-error" className="border-b border-amber-700 bg-amber-900/40 px-3 py-1 text-xs text-amber-200">
+          Live updates unavailable — refresh manually.
+          <button
+            type="button"
+            onClick={() => useWorkspace.getState().setWatcherError(null)}
+            className="ml-2 text-amber-300 hover:text-amber-100"
+          >×</button>
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-auto py-1">
         {rootLoading && !kids && (
           <div className="px-3 py-1 text-xs italic text-neutral-500">Loading…</div>
