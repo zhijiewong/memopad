@@ -52,6 +52,7 @@ interface BuffersState {
   splitActive: boolean;
   secondaryId: string | null;
   focusedPane: 'primary' | 'secondary';
+  secondaryPaneState: Map<string, { cursor: number | null; scrollTop: number | null }>;
 
   newBuffer: () => string;
   openBuffer: (file: OpenedFile) => string;
@@ -71,6 +72,8 @@ interface BuffersState {
   setExternalChange: (id: string, flag: boolean) => void;
   setCursor: (id: string, cursor: number | null) => void;
   setScrollTop: (id: string, scrollTop: number | null) => void;
+  setSecondaryCursor: (bufferId: string, cursor: number | null) => void;
+  setSecondaryScrollTop: (bufferId: string, scrollTop: number | null) => void;
   replaceBuffer: (id: string, next: ReplaceBufferInput) => void;
   reloadIfOpen: (path: string) => Promise<void>;
   resetAll: () => void;
@@ -111,6 +114,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   splitActive: false,
   secondaryId: null,
   focusedPane: 'primary',
+  secondaryPaneState: new Map<string, { cursor: number | null; scrollTop: number | null }>(),
 
   newBuffer: () => {
     const buf = emptyBuffer();
@@ -176,7 +180,9 @@ export const useBuffers = create<BuffersState>((set, get) => ({
         nextSecondary = nextActive;
       }
       const recent = [closed, ...s.recentlyClosed].slice(0, RECENT_CAP);
-      return { buffers: next, activeId: nextActive, secondaryId: nextSecondary, recentlyClosed: recent };
+      const nextPaneState = new Map(s.secondaryPaneState);
+      nextPaneState.delete(id);
+      return { buffers: next, activeId: nextActive, secondaryId: nextSecondary, recentlyClosed: recent, secondaryPaneState: nextPaneState };
     });
   },
 
@@ -301,6 +307,24 @@ export const useBuffers = create<BuffersState>((set, get) => ({
     }));
   },
 
+  setSecondaryCursor: (bufferId, cursor) => {
+    set((s) => {
+      const next = new Map(s.secondaryPaneState);
+      const existing = next.get(bufferId) ?? { cursor: null, scrollTop: null };
+      next.set(bufferId, { ...existing, cursor });
+      return { secondaryPaneState: next };
+    });
+  },
+
+  setSecondaryScrollTop: (bufferId, scrollTop) => {
+    set((s) => {
+      const next = new Map(s.secondaryPaneState);
+      const existing = next.get(bufferId) ?? { cursor: null, scrollTop: null };
+      next.set(bufferId, { ...existing, scrollTop });
+      return { secondaryPaneState: next };
+    });
+  },
+
   replaceBuffer: (id, next) => {
     set((s) => ({
       buffers: s.buffers.map((b) =>
@@ -373,4 +397,25 @@ export function selectFocused(state: BuffersState): Buffer | null {
 /** Convenience selector for the focused buffer ID. */
 export function selectFocusedId(state: BuffersState): string | null {
   return state.focusedPane === 'primary' ? state.activeId : state.secondaryId;
+}
+
+/**
+ * Pure selector: read cursor + scrollTop for a (pane, buffer) pair.
+ * - Primary always reads from the buffer's own fields.
+ * - Secondary reads from the Map; if absent, falls back to primary's state
+ *   (copy-on-first-mount semantics).
+ */
+export function selectPaneState(
+  state: BuffersState,
+  pane: 'primary' | 'secondary',
+  bufferId: string | null,
+): { cursor: number | null; scrollTop: number | null } {
+  if (bufferId == null) return { cursor: null, scrollTop: null };
+  const buf = state.buffers.find((b) => b.id === bufferId);
+  if (pane === 'primary') {
+    return { cursor: buf?.cursor ?? null, scrollTop: buf?.scrollTop ?? null };
+  }
+  const entry = state.secondaryPaneState.get(bufferId);
+  if (entry) return entry;
+  return { cursor: buf?.cursor ?? null, scrollTop: buf?.scrollTop ?? null };
 }
