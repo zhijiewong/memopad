@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useBuffers, selectActive, type Encoding, type LineEnding } from '../stores/buffers';
+import { useBuffers, selectFocused, type Encoding, type LineEnding } from '../stores/buffers';
 import { EncodingPopover } from './EncodingPopover';
 import { EolPopover } from './EolPopover';
 
@@ -27,7 +27,7 @@ function languageLabel(path: string | null): string {
 }
 
 export function StatusBar() {
-  const active = useBuffers(selectActive);
+  const active = useBuffers(selectFocused);
   const setActiveEncoding = useBuffers((s) => s.setActiveEncoding);
   const setActiveEol = useBuffers((s) => s.setActiveEol);
 

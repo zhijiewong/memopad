@@ -1,4 +1,4 @@
-import { useBuffers, selectActive } from '../stores/buffers';
+import { useBuffers, selectFocused, selectFocusedId } from '../stores/buffers';
 import { openFile, saveFile, revealInExplorer } from '../lib/tauri';
 import { pickFileToOpen, pickFileToSave } from '../lib/dialog';
 import { useCommands } from './registry';
@@ -16,7 +16,7 @@ async function doOpen() {
 }
 
 async function doSave(saveAs: boolean) {
-  const active = selectActive(useBuffers.getState());
+  const active = selectFocused(useBuffers.getState());
   if (!active) return;
   let path = active.path;
   if (!path || saveAs) {
@@ -74,7 +74,7 @@ export function registerBuiltins() {
     title: 'Tab: Close',
     shortcut: 'Ctrl+W',
     run: () => {
-      const id = useBuffers.getState().activeId;
+      const id = selectFocusedId(useBuffers.getState());
       if (id) useBuffers.getState().closeBuffer(id);
     },
   });
@@ -89,11 +89,12 @@ export function registerBuiltins() {
     title: 'Tab: Next',
     shortcut: 'Ctrl+Tab',
     run: () => {
-      const { buffers, activeId } = useBuffers.getState();
-      if (buffers.length < 2) return;
-      const idx = buffers.findIndex((b) => b.id === activeId);
-      const next = (idx + 1) % buffers.length;
-      useBuffers.getState().switchTo(buffers[next].id);
+      const state = useBuffers.getState();
+      const focusedId = selectFocusedId(state);
+      if (state.buffers.length < 2) return;
+      const idx = state.buffers.findIndex((b) => b.id === focusedId);
+      const next = (idx + 1) % state.buffers.length;
+      useBuffers.getState().setFocusedBuffer(state.buffers[next].id);
     },
   });
   register({
@@ -101,11 +102,12 @@ export function registerBuiltins() {
     title: 'Tab: Previous',
     shortcut: 'Ctrl+Shift+Tab',
     run: () => {
-      const { buffers, activeId } = useBuffers.getState();
-      if (buffers.length < 2) return;
-      const idx = buffers.findIndex((b) => b.id === activeId);
-      const prev = (idx - 1 + buffers.length) % buffers.length;
-      useBuffers.getState().switchTo(buffers[prev].id);
+      const state = useBuffers.getState();
+      const focusedId = selectFocusedId(state);
+      if (state.buffers.length < 2) return;
+      const idx = state.buffers.findIndex((b) => b.id === focusedId);
+      const prev = (idx - 1 + state.buffers.length) % state.buffers.length;
+      useBuffers.getState().setFocusedBuffer(state.buffers[prev].id);
     },
   });
 
@@ -113,7 +115,7 @@ export function registerBuiltins() {
     id: 'tab.copyPath',
     title: 'Tab: Copy Path',
     run: () => {
-      const a = selectActive(useBuffers.getState());
+      const a = selectFocused(useBuffers.getState());
       if (a?.path) navigator.clipboard.writeText(a.path).catch(() => {});
     },
   });
@@ -121,7 +123,7 @@ export function registerBuiltins() {
     id: 'tab.revealInExplorer',
     title: 'Tab: Reveal in Explorer',
     run: () => {
-      const a = selectActive(useBuffers.getState());
+      const a = selectFocused(useBuffers.getState());
       if (a?.path) revealInExplorer(a.path).catch(console.error);
     },
   });
@@ -212,5 +214,12 @@ export function registerBuiltins() {
       (window as unknown as { __memopadOpenPaletteWithQuery?: (q: string) => void })
         .__memopadOpenPaletteWithQuery?.('Open Recent: ');
     },
+  });
+
+  register({
+    id: 'view.toggleSplit',
+    title: 'Toggle Split View',
+    shortcut: 'Ctrl+\\',
+    run: () => { useBuffers.getState().toggleSplit(); },
   });
 }

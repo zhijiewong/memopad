@@ -49,12 +49,18 @@ interface BuffersState {
   buffers: Buffer[];
   activeId: string | null;
   recentlyClosed: Buffer[];
+  splitActive: boolean;
+  secondaryId: string | null;
+  focusedPane: 'primary' | 'secondary';
 
   newBuffer: () => string;
   openBuffer: (file: OpenedFile) => string;
   openRestored: (input: RestoredBufferInput) => string;
   closeBuffer: (id: string) => void;
   switchTo: (id: string) => void;
+  toggleSplit: () => void;
+  setFocusedPane: (p: 'primary' | 'secondary') => void;
+  setFocusedBuffer: (id: string) => void;
   setActiveContent: (next: string) => void;
   markSaved: (id: string, newPath: string) => void;
   setActiveEncoding: (enc: Encoding) => void;
@@ -102,6 +108,9 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   buffers: [],
   activeId: null,
   recentlyClosed: [],
+  splitActive: false,
+  secondaryId: null,
+  focusedPane: 'primary',
 
   newBuffer: () => {
     const buf = emptyBuffer();
@@ -162,13 +171,40 @@ export const useBuffers = create<BuffersState>((set, get) => ({
         else if (idx < next.length) nextActive = next[idx].id;
         else nextActive = next[next.length - 1].id;
       }
+      let nextSecondary: string | null = s.secondaryId;
+      if (s.secondaryId === id) {
+        nextSecondary = nextActive;
+      }
       const recent = [closed, ...s.recentlyClosed].slice(0, RECENT_CAP);
-      return { buffers: next, activeId: nextActive, recentlyClosed: recent };
+      return { buffers: next, activeId: nextActive, secondaryId: nextSecondary, recentlyClosed: recent };
     });
   },
 
   switchTo: (id) => {
     set((s) => (s.buffers.some((b) => b.id === id) ? { activeId: id } : s));
+  },
+
+  toggleSplit: () => {
+    set((s) => {
+      if (!s.splitActive) {
+        return { splitActive: true, secondaryId: s.activeId, focusedPane: 'secondary' };
+      }
+      return { splitActive: false, secondaryId: null, focusedPane: 'primary' };
+    });
+  },
+
+  setFocusedPane: (p) => {
+    set((s) => {
+      if (!s.splitActive && p === 'secondary') return s;
+      return { focusedPane: p };
+    });
+  },
+
+  setFocusedBuffer: (id) => {
+    set((s) => {
+      if (s.focusedPane === 'primary') return { activeId: id };
+      return { secondaryId: id };
+    });
   },
 
   setActiveContent: (next) => {
@@ -325,4 +361,16 @@ export const useBuffers = create<BuffersState>((set, get) => ({
 export function selectActive(state: BuffersState): Buffer | null {
   if (state.activeId == null) return null;
   return state.buffers.find((b) => b.id === state.activeId) ?? null;
+}
+
+/** Convenience selector for the focused buffer (the one user actions target). */
+export function selectFocused(state: BuffersState): Buffer | null {
+  const id = state.focusedPane === 'primary' ? state.activeId : state.secondaryId;
+  if (id == null) return null;
+  return state.buffers.find((b) => b.id === id) ?? null;
+}
+
+/** Convenience selector for the focused buffer ID. */
+export function selectFocusedId(state: BuffersState): string | null {
+  return state.focusedPane === 'primary' ? state.activeId : state.secondaryId;
 }

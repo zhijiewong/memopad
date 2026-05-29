@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useBuffers, selectActive } from '../stores/buffers';
+import { useBuffers, selectFocused } from '../stores/buffers';
 import { openFile, statFile } from '../lib/tauri';
 import { DiffModal } from './DiffModal';
 
 export function ExternalChangeBanner() {
-  const active = useBuffers(selectActive);
+  const active = useBuffers(selectFocused);
   const [diffOpen, setDiffOpen] = useState(false);
 
   if (!active || !active.externalChange || !active.path) return null;
