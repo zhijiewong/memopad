@@ -3,6 +3,7 @@ import { TitleBar } from './components/TitleBar';
 import { UpdateBanner } from './components/UpdateBanner';
 import { Editor } from './components/Editor';
 import { CommandPalette } from './components/CommandPalette';
+import { QuickOpenPalette } from './components/QuickOpenPalette';
 import { StatusBar } from './components/StatusBar';
 import { Sidebar } from './components/Sidebar';
 import { useCommands } from './commands/registry';
@@ -71,6 +72,7 @@ async function rescanExternalChanges() {
 
 export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [quickOpenShown, setQuickOpenShown] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [presetQuery, setPresetQuery] = useState('');
 
@@ -133,6 +135,7 @@ export default function App() {
       setPresetQuery(q);
       setPaletteOpen(true);
     };
+    (window as unknown as { __memopadShowQuickOpen?: () => void }).__memopadShowQuickOpen = () => setQuickOpenShown(true);
   }, []);
 
   useEffect(() => {
@@ -169,6 +172,11 @@ export default function App() {
         return;
       }
       if (key === 'k' && !e.shiftKey) { e.preventDefault(); setPaletteOpen(true); return; }
+      if (key === 'p' && !e.shiftKey) {
+        e.preventDefault();
+        runCommand('quickOpen.show');
+        return;
+      }
       if (key === 'p' && e.shiftKey)  { e.preventDefault(); setPaletteOpen(true); return; }
       if (key === 'o' && !e.shiftKey) { e.preventDefault(); runCommand('file.open'); return; }
       if (key === 's' && !e.shiftKey) { e.preventDefault(); runCommand('file.save'); return; }
@@ -204,6 +212,9 @@ export default function App() {
           onRun={runCommand}
           initialQuery={presetQuery}
         />
+      )}
+      {quickOpenShown && (
+        <QuickOpenPalette onClose={() => setQuickOpenShown(false)} />
       )}
     </div>
   );
