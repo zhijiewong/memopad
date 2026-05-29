@@ -121,6 +121,11 @@ fn list_dir(workspace_folder: String, path: String)
 }
 
 #[tauri::command]
+fn walk_files(workspace_folder: String) -> Result<files::WalkResponse, String> {
+    files::walk_files(std::path::Path::new(&workspace_folder)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn replace_in_files(
     folder: String,
     query: String,
@@ -174,6 +179,7 @@ pub fn run() {
             stat_file,
             find_in_folder,
             list_dir,
+            walk_files,
             replace_in_files,
             watch_start,
             watch_stop,

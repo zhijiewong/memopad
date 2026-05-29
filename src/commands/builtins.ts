@@ -222,4 +222,14 @@ export function registerBuiltins() {
     shortcut: 'Ctrl+\\',
     run: () => { useBuffers.getState().toggleSplit(); },
   });
+
+  register({
+    id: 'quickOpen.show',
+    title: 'Go to File…',
+    shortcut: 'Ctrl+P',
+    run: () => {
+      (window as unknown as { __memopadShowQuickOpen?: () => void })
+        .__memopadShowQuickOpen?.();
+    },
+  });
 }

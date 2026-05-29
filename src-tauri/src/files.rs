@@ -85,6 +85,54 @@ pub fn list_dir_under(workspace: &Path, path: &Path) -> Result<Vec<DirEntry>, Fi
     list_dir(&path_canon)
 }
 
+pub const MAX_QUICK_OPEN_FILES: usize = 10_000;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WalkResponse {
+    pub files: Vec<String>,
+    pub truncated: bool,
+    pub elapsed_ms: u64,
+}
+
+pub fn walk_files(workspace: &Path) -> Result<WalkResponse, FilesError> {
+    use ignore::WalkBuilder;
+
+    if !workspace.exists() {
+        return Err(FilesError::PathMissing);
+    }
+    if !workspace.is_dir() {
+        return Err(FilesError::NotADirectory);
+    }
+
+    let started = std::time::Instant::now();
+
+    let mut files: Vec<String> = Vec::new();
+    let mut walker = WalkBuilder::new(workspace);
+    walker.standard_filters(true);
+    walker.require_git(false);
+    let walker = walker.build();
+
+    let mut truncated = false;
+    for entry in walker {
+        if files.len() >= MAX_QUICK_OPEN_FILES {
+            truncated = true;
+            break;
+        }
+        let entry = match entry { Ok(e) => e, Err(_) => continue };
+        if entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            files.push(entry.path().to_string_lossy().to_string());
+        }
+    }
+
+    files.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+
+    Ok(WalkResponse {
+        files,
+        truncated,
+        elapsed_ms: started.elapsed().as_millis() as u64,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,5 +242,51 @@ mod tests {
         let other = tmp("ws_out");
         let err = list_dir_under(&workspace, &other).unwrap_err();
         match err { FilesError::PathMissing => {}, other => panic!("expected PathMissing, got {:?}", other) }
+    }
+
+    #[test]
+    fn walk_files_returns_all_files_under_workspace() {
+        let dir = tmp("walk_all");
+        touch(&dir, "a.txt");
+        touch(&dir, "sub/b.rs");
+        touch(&dir, "sub/c.json");
+
+        let resp = walk_files(&dir).unwrap();
+        let names: Vec<String> = resp.files.iter()
+            .map(|p| p.replace('\\', "/"))
+            .collect();
+        let names_concat = names.join("|");
+        assert!(names_concat.contains("a.txt"), "got {:?}", names);
+        assert!(names_concat.contains("sub/b.rs"), "got {:?}", names);
+        assert!(names_concat.contains("sub/c.json"), "got {:?}", names);
+        assert_eq!(resp.files.len(), 3, "expected exactly 3 files, got {:?}", names);
+        assert!(!resp.truncated);
+    }
+
+    #[test]
+    fn walk_files_respects_gitignore() {
+        let dir = tmp("walk_ignore");
+        std::fs::write(dir.join(".gitignore"), "target/\n").unwrap();
+        touch(&dir, "src/main.rs");
+        touch(&dir, "target/build.log");
+
+        let resp = walk_files(&dir).unwrap();
+        let names_concat: String = resp.files.iter()
+            .map(|p| p.replace('\\', "/"))
+            .collect::<Vec<_>>()
+            .join("|");
+        assert!(names_concat.contains("src/main.rs"), "got {:?}", resp.files);
+        assert!(!names_concat.contains("target/build.log"), "target/ should be filtered, got {:?}", resp.files);
+    }
+
+    #[test]
+    fn walk_files_caps_at_max_quick_open_files() {
+        let dir = tmp("walk_cap");
+        for i in 0..10_050 {
+            std::fs::write(dir.join(format!("f{}.txt", i)), b"").unwrap();
+        }
+        let resp = walk_files(&dir).unwrap();
+        assert!(resp.files.len() <= MAX_QUICK_OPEN_FILES, "got {} files, cap is {}", resp.files.len(), MAX_QUICK_OPEN_FILES);
+        assert!(resp.truncated, "expected truncated flag when above cap");
     }
 }

@@ -193,3 +193,13 @@ export async function watchStart(folder: string): Promise<void> {
 export async function watchStop(): Promise<void> {
   return invoke<void>('watch_stop');
 }
+
+export interface WalkResponse {
+  files: string[];
+  truncated: boolean;
+  elapsed_ms: number;
+}
+
+export async function walkFiles(workspaceFolder: string): Promise<WalkResponse> {
+  return invoke<WalkResponse>('walk_files', { workspaceFolder });
+}
