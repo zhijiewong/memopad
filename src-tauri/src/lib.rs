@@ -4,6 +4,7 @@ mod journal;
 mod search;
 mod session;
 mod stat;
+mod watcher;
 
 use std::process::Command;
 use tauri::Manager;
