@@ -36,6 +36,8 @@ export interface RestoredBufferInput {
   encoding: Encoding;
   eol: LineEnding;
   dirty: boolean;
+  cursor?: number | null;
+  scrollTop?: number | null;
 }
 
 export interface ReplaceBufferInput {
@@ -60,6 +62,12 @@ interface BuffersState {
   closeBuffer: (id: string) => void;
   switchTo: (id: string) => void;
   toggleSplit: () => void;
+  restoreSplitState: (input: {
+    active: boolean;
+    secondaryId: string | null;
+    focusedPane: 'primary' | 'secondary';
+    secondaryPaneState: Array<{ bufferId: string; cursor: number | null; scrollTop: number | null }>;
+  }) => void;
   setFocusedPane: (p: 'primary' | 'secondary') => void;
   setFocusedBuffer: (id: string) => void;
   setActiveContent: (next: string) => void;
@@ -156,8 +164,8 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       dirty: input.dirty,
       recordedStat: null,
       externalChange: false,
-      cursor: null,
-      scrollTop: null,
+      cursor: input.cursor ?? null,
+      scrollTop: input.scrollTop ?? null,
     };
     set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
     return buf.id;
@@ -196,6 +204,33 @@ export const useBuffers = create<BuffersState>((set, get) => ({
         return { splitActive: true, secondaryId: s.activeId, focusedPane: 'secondary' };
       }
       return { splitActive: false, secondaryId: null, focusedPane: 'primary' };
+    });
+  },
+
+  restoreSplitState: (input) => {
+    set((s) => {
+      const exists = (id: string | null) =>
+        id != null && s.buffers.some((b) => b.id === id);
+      const nextPaneState = new Map<string, { cursor: number | null; scrollTop: number | null }>();
+      for (const entry of input.secondaryPaneState) {
+        if (exists(entry.bufferId)) {
+          nextPaneState.set(entry.bufferId, { cursor: entry.cursor, scrollTop: entry.scrollTop });
+        }
+      }
+      if (input.active && exists(input.secondaryId)) {
+        return {
+          splitActive: true,
+          secondaryId: input.secondaryId,
+          focusedPane: input.focusedPane,
+          secondaryPaneState: nextPaneState,
+        };
+      }
+      return {
+        splitActive: false,
+        secondaryId: null,
+        focusedPane: 'primary',
+        secondaryPaneState: nextPaneState,
+      };
     });
   },
 

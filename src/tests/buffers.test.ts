@@ -437,3 +437,106 @@ describe('per-pane cursor + scroll', () => {
     expect(useBuffers.getState().secondaryPaneState.has(id)).toBe(false);
   });
 });
+
+describe('restoreSplitState', () => {
+  beforeEach(() => {
+    useBuffers.setState(useBuffers.getInitialState(), true);
+  });
+
+  it('openRestored applies cursor and scrollTop from input', () => {
+    const id = useBuffers.getState().openRestored({
+      bufferId: 'b1',
+      path: 'C:/a.txt',
+      content: 'hello',
+      encoding: 'utf-8',
+      eol: 'lf',
+      dirty: false,
+      cursor: 5,
+      scrollTop: 120,
+    });
+    const buf = useBuffers.getState().buffers.find((b) => b.id === id);
+    expect(buf?.cursor).toBe(5);
+    expect(buf?.scrollTop).toBe(120);
+  });
+
+  it('openRestored defaults cursor/scrollTop to null when omitted', () => {
+    const id = useBuffers.getState().openRestored({
+      bufferId: 'b2',
+      path: 'C:/b.txt',
+      content: '',
+      encoding: 'utf-8',
+      eol: 'lf',
+      dirty: false,
+    });
+    const buf = useBuffers.getState().buffers.find((b) => b.id === id);
+    expect(buf?.cursor).toBeNull();
+    expect(buf?.scrollTop).toBeNull();
+  });
+
+  it('opens the split when secondaryId resolves to a live buffer', () => {
+    useBuffers.getState().openRestored({
+      bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().openRestored({
+      bufferId: 'b2', path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().restoreSplitState({
+      active: true,
+      secondaryId: 'b2',
+      focusedPane: 'secondary',
+      secondaryPaneState: [{ bufferId: 'b2', cursor: 3, scrollTop: 50 }],
+    });
+    const s = useBuffers.getState();
+    expect(s.splitActive).toBe(true);
+    expect(s.secondaryId).toBe('b2');
+    expect(s.focusedPane).toBe('secondary');
+    expect(s.secondaryPaneState.get('b2')).toEqual({ cursor: 3, scrollTop: 50 });
+  });
+
+  it('collapses when secondaryId does not resolve to a buffer', () => {
+    useBuffers.getState().openRestored({
+      bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().restoreSplitState({
+      active: true,
+      secondaryId: 'gone',
+      focusedPane: 'secondary',
+      secondaryPaneState: [],
+    });
+    const s = useBuffers.getState();
+    expect(s.splitActive).toBe(false);
+    expect(s.secondaryId).toBeNull();
+    expect(s.focusedPane).toBe('primary');
+  });
+
+  it('forces focusedPane to primary when collapsing', () => {
+    useBuffers.getState().restoreSplitState({
+      active: false,
+      secondaryId: null,
+      focusedPane: 'secondary',
+      secondaryPaneState: [],
+    });
+    expect(useBuffers.getState().focusedPane).toBe('primary');
+  });
+
+  it('filters secondaryPaneState to buffers that exist', () => {
+    useBuffers.getState().openRestored({
+      bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().openRestored({
+      bufferId: 'b2', path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().restoreSplitState({
+      active: true,
+      secondaryId: 'b2',
+      focusedPane: 'secondary',
+      secondaryPaneState: [
+        { bufferId: 'b2', cursor: 1, scrollTop: 2 },
+        { bufferId: 'ghost', cursor: 9, scrollTop: 9 },
+      ],
+    });
+    const map = useBuffers.getState().secondaryPaneState;
+    expect(map.has('b2')).toBe(true);
+    expect(map.has('ghost')).toBe(false);
+  });
+});
