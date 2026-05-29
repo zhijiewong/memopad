@@ -180,3 +180,16 @@ export async function replaceInFiles(
     folder, query, replacement, opts, targetPaths,
   });
 }
+
+export interface FsEventPayload {
+  kind: 'create' | 'remove' | 'modify';
+  path: string;
+}
+
+export async function watchStart(folder: string): Promise<void> {
+  return invoke<void>('watch_start', { folder });
+}
+
+export async function watchStop(): Promise<void> {
+  return invoke<void>('watch_stop');
+}
