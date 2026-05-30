@@ -170,6 +170,8 @@ export default function App() {
       const key = e.key.toLowerCase();
 
       if (key === 'b' && !e.shiftKey) { e.preventDefault(); setSidebarOpen((v) => !v); return; }
+      if (key === '1' && !e.shiftKey) { e.preventDefault(); runCommand('view.focusPrimaryPane'); return; }
+      if (key === '2' && !e.shiftKey) { e.preventDefault(); runCommand('view.focusSecondaryPane'); return; }
       // Match the physical backslash key (e.code) as well as the produced
       // character (e.key). On non-US keyboard layouts the backslash key emits
       // a different e.key, so keying only off e.key silently breaks Ctrl+\.
