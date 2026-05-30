@@ -501,14 +501,14 @@ describe('pane-aware routing', () => {
   function openTwoAndSplit() {
     const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
     const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
-    useBuffers.getState().toggleSplit(); // splitActive=true, secondaryId=b, focusedPane='secondary'
+    useBuffers.getState().toggleSplit(); // splitActive=true, secondaryId=b, focusedPane='secondary', activeId stays b
     return { a, b };
   }
 
   it('openBuffer routes a NEW file to the secondary pane when it is focused', () => {
-    const { a } = openTwoAndSplit();
+    const { b } = openTwoAndSplit();
     const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
-    expect(useBuffers.getState().activeId).toBe(a);       // left unchanged
+    expect(useBuffers.getState().activeId).toBe(b);       // left unchanged (split mirrors active=b)
     expect(useBuffers.getState().secondaryId).toBe(c);    // right got the new file
   });
 
@@ -525,9 +525,9 @@ describe('pane-aware routing', () => {
   });
 
   it('newBuffer routes to the secondary pane when it is focused', () => {
-    const { a } = openTwoAndSplit();
+    const { b } = openTwoAndSplit();
     const fresh = useBuffers.getState().newBuffer();
-    expect(useBuffers.getState().activeId).toBe(a);
+    expect(useBuffers.getState().activeId).toBe(b);       // left unchanged (split mirrors active=b)
     expect(useBuffers.getState().secondaryId).toBe(fresh);
   });
 
@@ -544,6 +544,15 @@ describe('pane-aware routing', () => {
     const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
     expect(useBuffers.getState().activeId).toBe(c);
     expect(useBuffers.getState().secondaryId).toBeNull();
+  });
+
+  it('toggleSplit mirrors the active buffer to secondary WITHOUT changing activeId', () => {
+    useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().toggleSplit();
+    expect(useBuffers.getState().activeId).toBe(b);       // left pane stays on the active file
+    expect(useBuffers.getState().secondaryId).toBe(b);    // right mirrors it
+    expect(useBuffers.getState().focusedPane).toBe('secondary');
   });
 });
 

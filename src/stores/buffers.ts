@@ -214,10 +214,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   toggleSplit: () => {
     set((s) => {
       if (!s.splitActive) {
-        // Move current active to secondary; primary shows the preceding buffer (if any).
-        const idx = s.activeId == null ? -1 : s.buffers.findIndex((b) => b.id === s.activeId);
-        const prevId = idx > 0 ? s.buffers[idx - 1].id : s.activeId;
-        return { splitActive: true, secondaryId: s.activeId, activeId: prevId, focusedPane: 'secondary' };
+        return { splitActive: true, secondaryId: s.activeId, focusedPane: 'secondary' };
       }
       return { splitActive: false, secondaryId: null, focusedPane: 'primary' };
     });
