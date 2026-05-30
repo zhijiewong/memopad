@@ -36,6 +36,8 @@ export interface RestoredBufferInput {
   encoding: Encoding;
   eol: LineEnding;
   dirty: boolean;
+  cursor?: number | null;
+  scrollTop?: number | null;
 }
 
 export interface ReplaceBufferInput {
@@ -43,6 +45,13 @@ export interface ReplaceBufferInput {
   content: string;
   encoding: Encoding;
   eol: LineEnding;
+}
+
+export interface RestoreSplitInput {
+  splitActive: boolean;
+  secondaryId: string | null;
+  focusedPane: 'primary' | 'secondary';
+  secondaryPaneState: Array<{ bufferId: string; cursor: number | null; scrollTop: number | null }>;
 }
 
 interface BuffersState {
@@ -60,6 +69,7 @@ interface BuffersState {
   closeBuffer: (id: string) => void;
   switchTo: (id: string) => void;
   toggleSplit: () => void;
+  restoreSplitState: (input: RestoreSplitInput) => void;
   setFocusedPane: (p: 'primary' | 'secondary') => void;
   setFocusedBuffer: (id: string) => void;
   setActiveContent: (next: string) => void;
@@ -107,6 +117,17 @@ function emptyBuffer(): Buffer {
   };
 }
 
+/**
+ * Route a "show this buffer" action to the focused pane: the secondary pane
+ * when the split is active and focused, otherwise the primary pane.
+ */
+function routeToFocusedPane(s: BuffersState, id: string): Partial<BuffersState> {
+  if (s.splitActive && s.focusedPane === 'secondary') {
+    return { secondaryId: id };
+  }
+  return { activeId: id };
+}
+
 export const useBuffers = create<BuffersState>((set, get) => ({
   buffers: [],
   activeId: null,
@@ -118,14 +139,14 @@ export const useBuffers = create<BuffersState>((set, get) => ({
 
   newBuffer: () => {
     const buf = emptyBuffer();
-    set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
+    set((s) => ({ buffers: [...s.buffers, buf], ...routeToFocusedPane(s, buf.id) }));
     return buf.id;
   },
 
   openBuffer: (file) => {
     const existing = get().buffers.find((b) => b.path === file.path);
     if (existing) {
-      set({ activeId: existing.id });
+      set((s) => routeToFocusedPane(s, existing.id));
       return existing.id;
     }
     const buf: Buffer = {
@@ -141,7 +162,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       cursor: null,
       scrollTop: null,
     };
-    set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
+    set((s) => ({ buffers: [...s.buffers, buf], ...routeToFocusedPane(s, buf.id) }));
     return buf.id;
   },
 
@@ -156,8 +177,8 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       dirty: input.dirty,
       recordedStat: null,
       externalChange: false,
-      cursor: null,
-      scrollTop: null,
+      cursor: input.cursor ?? null,
+      scrollTop: input.scrollTop ?? null,
     };
     set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
     return buf.id;
@@ -169,25 +190,40 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       if (idx < 0) return s;
       const closed = s.buffers[idx];
       const next = s.buffers.filter((b) => b.id !== id);
+      // Index-based advance among the remaining buffers (buffer at the closed
+      // index, else the last one), or null if none remain.
+      const advance = (): string | null => {
+        if (next.length === 0) return null;
+        return idx < next.length ? next[idx].id : next[next.length - 1].id;
+      };
       let nextActive: string | null = s.activeId;
-      if (s.activeId === id) {
-        if (next.length === 0) nextActive = null;
-        else if (idx < next.length) nextActive = next[idx].id;
-        else nextActive = next[next.length - 1].id;
-      }
+      if (s.activeId === id) nextActive = advance();
       let nextSecondary: string | null = s.secondaryId;
-      if (s.secondaryId === id) {
-        nextSecondary = nextActive;
+      if (s.secondaryId === id) nextSecondary = advance();
+      let splitActive = s.splitActive;
+      let focusedPane = s.focusedPane;
+      if (next.length === 0) {
+        splitActive = false;
+        nextSecondary = null;
+        focusedPane = 'primary';
       }
       const recent = [closed, ...s.recentlyClosed].slice(0, RECENT_CAP);
       const nextPaneState = new Map(s.secondaryPaneState);
       nextPaneState.delete(id);
-      return { buffers: next, activeId: nextActive, secondaryId: nextSecondary, recentlyClosed: recent, secondaryPaneState: nextPaneState };
+      return {
+        buffers: next,
+        activeId: nextActive,
+        secondaryId: nextSecondary,
+        splitActive,
+        focusedPane,
+        recentlyClosed: recent,
+        secondaryPaneState: nextPaneState,
+      };
     });
   },
 
   switchTo: (id) => {
-    set((s) => (s.buffers.some((b) => b.id === id) ? { activeId: id } : s));
+    set((s) => (s.buffers.some((b) => b.id === id) ? routeToFocusedPane(s, id) : s));
   },
 
   toggleSplit: () => {
@@ -196,6 +232,33 @@ export const useBuffers = create<BuffersState>((set, get) => ({
         return { splitActive: true, secondaryId: s.activeId, focusedPane: 'secondary' };
       }
       return { splitActive: false, secondaryId: null, focusedPane: 'primary' };
+    });
+  },
+
+  restoreSplitState: (input) => {
+    set((s) => {
+      const exists = (id: string | null) =>
+        id != null && s.buffers.some((b) => b.id === id);
+      const nextPaneState = new Map<string, { cursor: number | null; scrollTop: number | null }>();
+      for (const entry of input.secondaryPaneState) {
+        if (exists(entry.bufferId)) {
+          nextPaneState.set(entry.bufferId, { cursor: entry.cursor, scrollTop: entry.scrollTop });
+        }
+      }
+      if (input.splitActive && exists(input.secondaryId)) {
+        return {
+          splitActive: true,
+          secondaryId: input.secondaryId,
+          focusedPane: input.focusedPane,
+          secondaryPaneState: nextPaneState,
+        };
+      }
+      return {
+        splitActive: false,
+        secondaryId: null,
+        focusedPane: 'primary',
+        secondaryPaneState: nextPaneState,
+      };
     });
   },
 
@@ -277,8 +340,8 @@ export const useBuffers = create<BuffersState>((set, get) => ({
     const restored: Buffer = { ...restoredOrig, id: genId() };
     set((s) => ({
       buffers: [...s.buffers, restored],
-      activeId: restored.id,
       recentlyClosed: rest,
+      ...routeToFocusedPane(s, restored.id),
     }));
     return restored.id;
   },
@@ -365,13 +428,21 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   },
 
   resetAll: () => {
-    set({ buffers: [], activeId: null, recentlyClosed: [] });
+    set({
+      buffers: [],
+      activeId: null,
+      recentlyClosed: [],
+      splitActive: false,
+      secondaryId: null,
+      focusedPane: 'primary',
+      secondaryPaneState: new Map(),
+    });
   },
 
   openFileAtLine(path, line, range, _snippet) {
     const existing = get().buffers.find((b) => b.path === path);
     if (existing) {
-      set({ activeId: existing.id });
+      set((s) => routeToFocusedPane(s, existing.id));
     } else {
       (window as unknown as { __memopadPendingJump?: { path: string; line: number; range: [number, number] } }).__memopadPendingJump = { path, line, range };
     }

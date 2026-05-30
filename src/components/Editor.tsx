@@ -43,6 +43,7 @@ export function Editor() {
               bufferId={activeId}
               focused={focusedPane === 'primary'}
               pane="primary"
+              inSplit={true}
               onFocus={() => setFocusedPane('primary')}
               onActionsReady={setActions}
               onSearchPanelOpen={(mode) => setSearchPanel({ open: true, mode })}
@@ -57,6 +58,7 @@ export function Editor() {
               bufferId={secondaryId}
               focused={focusedPane === 'secondary'}
               pane="secondary"
+              inSplit={true}
               onFocus={() => setFocusedPane('secondary')}
               onActionsReady={setActions}
               onSearchPanelOpen={(mode) => setSearchPanel({ open: true, mode })}
@@ -71,6 +73,7 @@ export function Editor() {
           bufferId={activeId}
           focused={true}
           pane="primary"
+          inSplit={false}
           onFocus={() => {}}
           onActionsReady={setActions}
           onSearchPanelOpen={(mode) => setSearchPanel({ open: true, mode })}

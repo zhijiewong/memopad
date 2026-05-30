@@ -346,6 +346,27 @@ describe('split view', () => {
     useBuffers.getState().closeBuffer(bId);
     expect(useBuffers.getState().secondaryId).toBe(aId);
   });
+
+  it('resetAll clears split state', () => {
+    useBuffers.getState().openRestored({
+      bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().openRestored({
+      bufferId: 'b2', path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().restoreSplitState({
+      splitActive: true,
+      secondaryId: 'b2',
+      focusedPane: 'secondary',
+      secondaryPaneState: [{ bufferId: 'b2', cursor: 1, scrollTop: 2 }],
+    });
+    useBuffers.getState().resetAll();
+    const s = useBuffers.getState();
+    expect(s.splitActive).toBe(false);
+    expect(s.secondaryId).toBeNull();
+    expect(s.focusedPane).toBe('primary');
+    expect(s.secondaryPaneState.size).toBe(0);
+  });
 });
 
 describe('reloadIfOpen', () => {
@@ -435,5 +456,241 @@ describe('per-pane cursor + scroll', () => {
 
     useBuffers.getState().closeBuffer(id);
     expect(useBuffers.getState().secondaryPaneState.has(id)).toBe(false);
+  });
+});
+
+describe('openRestored cursor/scroll', () => {
+  beforeEach(() => {
+    useBuffers.setState(useBuffers.getInitialState(), true);
+  });
+
+  it('openRestored applies cursor and scrollTop from input', () => {
+    const id = useBuffers.getState().openRestored({
+      bufferId: 'b1',
+      path: 'C:/a.txt',
+      content: 'hello',
+      encoding: 'utf-8',
+      eol: 'lf',
+      dirty: false,
+      cursor: 5,
+      scrollTop: 120,
+    });
+    const buf = useBuffers.getState().buffers.find((b) => b.id === id);
+    expect(buf?.cursor).toBe(5);
+    expect(buf?.scrollTop).toBe(120);
+  });
+
+  it('openRestored defaults cursor/scrollTop to null when omitted', () => {
+    const id = useBuffers.getState().openRestored({
+      bufferId: 'b2',
+      path: 'C:/b.txt',
+      content: '',
+      encoding: 'utf-8',
+      eol: 'lf',
+      dirty: false,
+    });
+    const buf = useBuffers.getState().buffers.find((b) => b.id === id);
+    expect(buf?.cursor).toBeNull();
+    expect(buf?.scrollTop).toBeNull();
+  });
+});
+
+describe('pane-aware routing', () => {
+  beforeEach(() => useBuffers.getState().resetAll());
+
+  function openTwoAndSplit() {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().toggleSplit(); // splitActive=true, secondaryId=b, focusedPane='secondary', activeId stays b
+    return { a, b };
+  }
+
+  it('openBuffer routes a NEW file to the secondary pane when it is focused', () => {
+    const { b } = openTwoAndSplit();
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    expect(useBuffers.getState().activeId).toBe(b);       // left unchanged (split mirrors active=b)
+    expect(useBuffers.getState().secondaryId).toBe(c);    // right got the new file
+  });
+
+  it('openBuffer routes an EXISTING file to the secondary pane when it is focused', () => {
+    const { a } = openTwoAndSplit();
+    useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    expect(useBuffers.getState().secondaryId).toBe(a);
+  });
+
+  it('switchTo routes to the secondary pane when it is focused', () => {
+    const { a } = openTwoAndSplit();
+    useBuffers.getState().switchTo(a);
+    expect(useBuffers.getState().secondaryId).toBe(a);
+  });
+
+  it('newBuffer routes to the secondary pane when it is focused', () => {
+    const { b } = openTwoAndSplit();
+    const fresh = useBuffers.getState().newBuffer();
+    expect(useBuffers.getState().activeId).toBe(b);       // left unchanged (split mirrors active=b)
+    expect(useBuffers.getState().secondaryId).toBe(fresh);
+  });
+
+  it('routes to the PRIMARY pane when primary is focused', () => {
+    openTwoAndSplit();
+    useBuffers.getState().setFocusedPane('primary');
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    expect(useBuffers.getState().activeId).toBe(c);
+  });
+
+  it('routes to the PRIMARY pane when not split', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    expect(a).toBe(useBuffers.getState().activeId);
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    expect(useBuffers.getState().activeId).toBe(c);
+    expect(useBuffers.getState().secondaryId).toBeNull();
+  });
+
+  it('toggleSplit mirrors the active buffer to secondary WITHOUT changing activeId', () => {
+    useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().toggleSplit();
+    expect(useBuffers.getState().activeId).toBe(b);       // left pane stays on the active file
+    expect(useBuffers.getState().secondaryId).toBe(b);    // right mirrors it
+    expect(useBuffers.getState().focusedPane).toBe('secondary');
+  });
+
+  it('switchTo routes to the primary pane when not split', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().switchTo(a);
+    expect(useBuffers.getState().activeId).toBe(a);
+    expect(useBuffers.getState().secondaryId).toBeNull();
+  });
+
+  it('reopenLastClosed routes the reopened buffer to the secondary pane when focused', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().closeBuffer(b);   // active falls back to a; b -> recentlyClosed
+    useBuffers.getState().toggleSplit();    // split; secondary=a; focus secondary
+    const reopened = useBuffers.getState().reopenLastClosed();
+    expect(useBuffers.getState().secondaryId).toBe(reopened);
+    expect(useBuffers.getState().activeId).toBe(a); // left pane unchanged
+  });
+});
+
+describe('closeBuffer in split', () => {
+  beforeEach(() => useBuffers.getState().resetAll());
+
+  it('closing the secondary buffer advances it to a different remaining buffer', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    // active=a (primary), secondary=c
+    useBuffers.setState({ activeId: a, splitActive: true, secondaryId: c, focusedPane: 'secondary' });
+    useBuffers.getState().closeBuffer(c);
+    expect(useBuffers.getState().activeId).toBe(a);        // primary untouched
+    expect(useBuffers.getState().secondaryId).toBe(b);     // secondary advanced to b, not mirrored to a
+    expect(useBuffers.getState().splitActive).toBe(true);
+  });
+
+  it('closing the last remaining buffer collapses the split', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.setState({ activeId: a, splitActive: true, secondaryId: a, focusedPane: 'secondary' });
+    useBuffers.getState().closeBuffer(a);
+    expect(useBuffers.getState().activeId).toBeNull();
+    expect(useBuffers.getState().secondaryId).toBeNull();
+    expect(useBuffers.getState().splitActive).toBe(false);
+    expect(useBuffers.getState().focusedPane).toBe('primary');
+  });
+
+  it('closing the active (primary) buffer advances primary, secondary untouched', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.setState({ activeId: a, splitActive: true, secondaryId: c, focusedPane: 'primary' });
+    useBuffers.getState().closeBuffer(a);
+    expect(useBuffers.getState().activeId).toBe(b);    // advanced to idx 0 of [b, c]
+    expect(useBuffers.getState().secondaryId).toBe(c); // secondary untouched
+    expect(useBuffers.getState().splitActive).toBe(true);
+  });
+
+  it('closing a background buffer leaves both panes untouched', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.setState({ activeId: a, splitActive: true, secondaryId: b, focusedPane: 'primary' });
+    useBuffers.getState().closeBuffer(c);
+    expect(useBuffers.getState().activeId).toBe(a);
+    expect(useBuffers.getState().secondaryId).toBe(b);
+    expect(useBuffers.getState().splitActive).toBe(true);
+  });
+});
+
+describe('restoreSplitState', () => {
+  beforeEach(() => {
+    useBuffers.setState(useBuffers.getInitialState(), true);
+  });
+
+  it('opens the split when secondaryId resolves to a live buffer', () => {
+    useBuffers.getState().openRestored({
+      bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().openRestored({
+      bufferId: 'b2', path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().restoreSplitState({
+      splitActive: true,
+      secondaryId: 'b2',
+      focusedPane: 'secondary',
+      secondaryPaneState: [{ bufferId: 'b2', cursor: 3, scrollTop: 50 }],
+    });
+    const s = useBuffers.getState();
+    expect(s.splitActive).toBe(true);
+    expect(s.secondaryId).toBe('b2');
+    expect(s.focusedPane).toBe('secondary');
+    expect(s.secondaryPaneState.get('b2')).toEqual({ cursor: 3, scrollTop: 50 });
+  });
+
+  it('collapses when secondaryId does not resolve to a buffer', () => {
+    useBuffers.getState().openRestored({
+      bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().restoreSplitState({
+      splitActive: true,
+      secondaryId: 'gone',
+      focusedPane: 'secondary',
+      secondaryPaneState: [],
+    });
+    const s = useBuffers.getState();
+    expect(s.splitActive).toBe(false);
+    expect(s.secondaryId).toBeNull();
+    expect(s.focusedPane).toBe('primary');
+  });
+
+  it('forces focusedPane to primary when collapsing', () => {
+    useBuffers.getState().restoreSplitState({
+      splitActive: false,
+      secondaryId: null,
+      focusedPane: 'secondary',
+      secondaryPaneState: [],
+    });
+    expect(useBuffers.getState().focusedPane).toBe('primary');
+  });
+
+  it('filters secondaryPaneState to buffers that exist', () => {
+    useBuffers.getState().openRestored({
+      bufferId: 'b1', path: 'C:/a.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().openRestored({
+      bufferId: 'b2', path: 'C:/b.txt', content: '', encoding: 'utf-8', eol: 'lf', dirty: false,
+    });
+    useBuffers.getState().restoreSplitState({
+      splitActive: true,
+      secondaryId: 'b2',
+      focusedPane: 'secondary',
+      secondaryPaneState: [
+        { bufferId: 'b2', cursor: 1, scrollTop: 2 },
+        { bufferId: 'ghost', cursor: 9, scrollTop: 9 },
+      ],
+    });
+    const map = useBuffers.getState().secondaryPaneState;
+    expect(map.has('b2')).toBe(true);
+    expect(map.has('ghost')).toBe(false);
   });
 });

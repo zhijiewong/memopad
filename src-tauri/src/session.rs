@@ -3,13 +3,36 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TabEntry {
     pub buffer_id: String,
     pub path: Option<String>,
+    #[serde(default)]
+    pub cursor: Option<f64>,
+    #[serde(default)]
+    pub scroll_top: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Which editor pane has focus. Serializes lowercase to match the TS union
+/// `'primary' | 'secondary'`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PaneSide {
+    #[default]
+    Primary,
+    Secondary,
+}
+
+/// Per-buffer cursor/scroll for the secondary pane (mirrors the store's
+/// `secondaryPaneState` Map).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PaneCursor {
+    pub buffer_id: String,
+    pub cursor: Option<f64>,
+    pub scroll_top: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SessionState {
     pub tabs: Vec<TabEntry>,
     pub active_id: Option<String>,
@@ -17,11 +40,28 @@ pub struct SessionState {
     pub workspace_folder: Option<String>,
     #[serde(default)]
     pub recent_folders: Vec<String>,
+    #[serde(default)]
+    pub split_active: bool,
+    #[serde(default)]
+    pub secondary_id: Option<String>,
+    #[serde(default)]
+    pub focused_pane: PaneSide,
+    #[serde(default)]
+    pub secondary_pane_state: Vec<PaneCursor>,
 }
 
 impl Default for SessionState {
     fn default() -> Self {
-        Self { tabs: Vec::new(), active_id: None, workspace_folder: None, recent_folders: Vec::new() }
+        Self {
+            tabs: Vec::new(),
+            active_id: None,
+            workspace_folder: None,
+            recent_folders: Vec::new(),
+            split_active: false,
+            secondary_id: None,
+            focused_pane: PaneSide::Primary,
+            secondary_pane_state: Vec::new(),
+        }
     }
 }
 
@@ -75,12 +115,16 @@ mod tests {
         let dir = tmp();
         let state = SessionState {
             tabs: vec![
-                TabEntry { buffer_id: "b1".into(), path: Some("/a.txt".into()) },
-                TabEntry { buffer_id: "b2".into(), path: None },
+                TabEntry { buffer_id: "b1".into(), path: Some("/a.txt".into()), cursor: None, scroll_top: None },
+                TabEntry { buffer_id: "b2".into(), path: None, cursor: None, scroll_top: None },
             ],
             active_id: Some("b1".into()),
             workspace_folder: None,
             recent_folders: Vec::new(),
+            split_active: false,
+            secondary_id: None,
+            focused_pane: PaneSide::Primary,
+            secondary_pane_state: Vec::new(),
         };
         save_at(&dir, &state).unwrap();
         let loaded = load_at(&dir);
@@ -106,10 +150,14 @@ mod tests {
     fn save_overwrites_previous() {
         let dir = tmp();
         save_at(&dir, &SessionState {
-            tabs: vec![TabEntry { buffer_id: "old".into(), path: None }],
+            tabs: vec![TabEntry { buffer_id: "old".into(), path: None, cursor: None, scroll_top: None }],
             active_id: None,
             workspace_folder: None,
             recent_folders: Vec::new(),
+            split_active: false,
+            secondary_id: None,
+            focused_pane: PaneSide::Primary,
+            secondary_pane_state: Vec::new(),
         }).unwrap();
         save_at(&dir, &SessionState::default()).unwrap();
         assert_eq!(load_at(&dir), SessionState::default());
@@ -133,6 +181,10 @@ mod tests {
             active_id: None,
             workspace_folder: Some("C:\\proj".into()),
             recent_folders: Vec::new(),
+            split_active: false,
+            secondary_id: None,
+            focused_pane: PaneSide::Primary,
+            secondary_pane_state: Vec::new(),
         };
         save_at(&dir, &state).unwrap();
         assert_eq!(load_at(&dir).workspace_folder, Some("C:\\proj".into()));
@@ -157,8 +209,61 @@ mod tests {
             active_id: None,
             workspace_folder: None,
             recent_folders: vec!["C:\\a".into(), "C:\\b".into()],
+            split_active: false,
+            secondary_id: None,
+            focused_pane: PaneSide::Primary,
+            secondary_pane_state: Vec::new(),
         };
         save_at(&dir, &state).unwrap();
         assert_eq!(load_at(&dir).recent_folders, vec!["C:\\a".to_string(), "C:\\b".to_string()]);
+    }
+
+    #[test]
+    fn round_trips_split_state() {
+        let dir = tmp();
+        let state = SessionState {
+            tabs: vec![TabEntry {
+                buffer_id: "b1".into(),
+                path: Some("/a.txt".into()),
+                cursor: Some(42.0),
+                scroll_top: Some(13.5),
+            }],
+            active_id: Some("b1".into()),
+            workspace_folder: None,
+            recent_folders: Vec::new(),
+            split_active: true,
+            secondary_id: Some("b1".into()),
+            focused_pane: PaneSide::Secondary,
+            secondary_pane_state: vec![PaneCursor {
+                buffer_id: "b1".into(),
+                cursor: Some(7.0),
+                scroll_top: Some(100.0),
+            }],
+        };
+        save_at(&dir, &state).unwrap();
+        assert_eq!(load_at(&dir), state);
+    }
+
+    #[test]
+    fn loads_old_session_without_split_fields() {
+        let dir = tmp();
+        let legacy = r#"{"tabs":[{"buffer_id":"b1","path":"/a.txt"}],"active_id":"b1","workspace_folder":"C:\\proj","recent_folders":["C:\\a"]}"#;
+        std::fs::write(session_path(&dir), legacy).unwrap();
+        let loaded = load_at(&dir);
+        assert_eq!(loaded.split_active, false);
+        assert_eq!(loaded.secondary_id, None);
+        assert_eq!(loaded.focused_pane, PaneSide::Primary);
+        assert_eq!(loaded.secondary_pane_state, Vec::<PaneCursor>::new());
+        // Legacy tabs deserialize with cursor/scroll defaulted to None.
+        assert_eq!(loaded.tabs[0].cursor, None);
+        assert_eq!(loaded.tabs[0].scroll_top, None);
+    }
+
+    #[test]
+    fn pane_side_serializes_lowercase() {
+        let primary = serde_json::to_string(&PaneSide::Primary).unwrap();
+        let secondary = serde_json::to_string(&PaneSide::Secondary).unwrap();
+        assert_eq!(primary, "\"primary\"");
+        assert_eq!(secondary, "\"secondary\"");
     }
 }

@@ -49,6 +49,14 @@ export interface RestoredEntry {
 export interface TabEntry {
   buffer_id: string;
   path: string | null;
+  cursor?: number | null;
+  scroll_top?: number | null;
+}
+
+export interface PaneCursor {
+  buffer_id: string;
+  cursor?: number | null;
+  scroll_top?: number | null;
 }
 
 export interface SessionState {
@@ -56,6 +64,10 @@ export interface SessionState {
   active_id: string | null;
   workspace_folder?: string | null;
   recent_folders?: string[];
+  split_active?: boolean;
+  secondary_id?: string | null;
+  focused_pane?: 'primary' | 'secondary';
+  secondary_pane_state?: PaneCursor[];
 }
 
 export interface FileStat {

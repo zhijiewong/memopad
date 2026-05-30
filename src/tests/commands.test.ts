@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCommands, search } from '../commands/registry';
-import { registerRecentFolderCommands } from '../commands/builtins';
+import { registerRecentFolderCommands, registerBuiltins } from '../commands/builtins';
+import { useBuffers } from '../stores/buffers';
 
 describe('command registry', () => {
   beforeEach(() => useCommands.getState().reset());
@@ -71,5 +72,36 @@ describe('registerRecentFolderCommands', () => {
     expect(recents.map((r) => r.title).sort()).toEqual(['Open Recent: bar', 'Open Recent: foo']);
     // Non-recent commands intact:
     expect(final.length).toBeGreaterThanOrEqual(initialCount);
+  });
+});
+
+describe('pane focus commands', () => {
+  beforeEach(() => {
+    useCommands.getState().reset();
+    useBuffers.getState().resetAll();
+    registerBuiltins();
+  });
+
+  function run(id: string) {
+    const cmd = useCommands.getState().commands.find((c) => c.id === id);
+    if (!cmd) throw new Error(`command ${id} not registered`);
+    cmd.run();
+  }
+
+  it('focusPrimaryPane and focusSecondaryPane round-trip when split is active', () => {
+    useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().toggleSplit();          // focusedPane becomes 'secondary'
+    run('view.focusPrimaryPane');
+    expect(useBuffers.getState().focusedPane).toBe('primary');
+    run('view.focusSecondaryPane');
+    expect(useBuffers.getState().focusedPane).toBe('secondary');
+  });
+
+  it('view.focusSecondaryPane is a no-op when not split', () => {
+    useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    run('view.focusSecondaryPane');
+    expect(useBuffers.getState().focusedPane).toBe('primary'); // secondary focus rejected when not split
+    run('view.focusPrimaryPane');
+    expect(useBuffers.getState().focusedPane).toBe('primary'); // primary focus always valid
   });
 });

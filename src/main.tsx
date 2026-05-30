@@ -22,6 +22,17 @@ const w = window as unknown as {
   __memopadTestRecordStat?: (id: string, stat: { mtime_ms: number; size: number }) => void;
   __memopadTestActiveDirty?: () => boolean;
   __memopadTestExternalChange?: () => boolean;
+  __memopadTestRestoreSplit?: (input: {
+    splitActive: boolean;
+    secondaryId: string | null;
+    focusedPane: 'primary' | 'secondary';
+    secondaryPaneState: Array<{ bufferId: string; cursor: number | null; scrollTop: number | null }>;
+  }) => void;
+  __memopadTestSplitState?: () => {
+    splitActive: boolean;
+    secondaryId: string | null;
+    focusedPane: 'primary' | 'secondary';
+  };
 };
 
 w.__memopadTestSetContent = (s) => useBuffers.getState().setActiveContent(s);
@@ -40,6 +51,11 @@ w.__memopadTestRecordStat = (id, stat) =>
 w.__memopadTestActiveDirty = () => selectActive(useBuffers.getState())?.dirty ?? false;
 w.__memopadTestExternalChange = () =>
   selectActive(useBuffers.getState())?.externalChange ?? false;
+w.__memopadTestRestoreSplit = (input) => useBuffers.getState().restoreSplitState(input);
+w.__memopadTestSplitState = () => {
+  const s = useBuffers.getState();
+  return { splitActive: s.splitActive, secondaryId: s.secondaryId, focusedPane: s.focusedPane };
+};
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

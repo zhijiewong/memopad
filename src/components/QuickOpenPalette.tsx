@@ -65,11 +65,10 @@ export function QuickOpenPalette({ onClose }: Props) {
     try {
       const existing = useBuffers.getState().buffers.find((b) => b.path === path);
       if (existing) {
-        useBuffers.getState().setFocusedBuffer(existing.id);
+        useBuffers.getState().switchTo(existing.id);
       } else {
         const opened = await openFile(path);
-        const newId = useBuffers.getState().openBuffer(opened);
-        useBuffers.getState().setFocusedBuffer(newId);
+        useBuffers.getState().openBuffer(opened); // routes to the focused pane
       }
       onClose();
     } catch (err) {

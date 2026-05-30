@@ -32,10 +32,21 @@ function persistSession() {
   const folder = useWorkspace.getState().workspaceFolder;
   const recent = useWorkspace.getState().recentFolders;
   scheduleSessionSave({
-    tabs: state.buffers.map((b) => ({ buffer_id: b.id, path: b.path })),
+    tabs: state.buffers.map((b) => ({
+      buffer_id: b.id,
+      path: b.path,
+      cursor: b.cursor,
+      scroll_top: b.scrollTop,
+    })),
     active_id: state.activeId,
     workspace_folder: folder,
     recent_folders: recent,
+    split_active: state.splitActive,
+    secondary_id: state.secondaryId,
+    focused_pane: state.focusedPane,
+    secondary_pane_state: Array.from(state.secondaryPaneState.entries()).map(
+      ([bufferId, v]) => ({ buffer_id: bufferId, cursor: v.cursor, scroll_top: v.scrollTop }),
+    ),
   });
 }
 
@@ -159,7 +170,12 @@ export default function App() {
       const key = e.key.toLowerCase();
 
       if (key === 'b' && !e.shiftKey) { e.preventDefault(); setSidebarOpen((v) => !v); return; }
-      if (key === '\\' && !e.shiftKey) {
+      if (key === '1' && !e.shiftKey) { e.preventDefault(); runCommand('view.focusPrimaryPane'); return; }
+      if (key === '2' && !e.shiftKey) { e.preventDefault(); runCommand('view.focusSecondaryPane'); return; }
+      // Match the physical backslash key (e.code) as well as the produced
+      // character (e.key). On non-US keyboard layouts the backslash key emits
+      // a different e.key, so keying only off e.key silently breaks Ctrl+\.
+      if ((key === '\\' || e.code === 'Backslash') && !e.shiftKey) {
         e.preventDefault();
         runCommand('view.toggleSplit');
         return;

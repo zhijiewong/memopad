@@ -224,6 +224,19 @@ export function registerBuiltins() {
   });
 
   register({
+    id: 'view.focusPrimaryPane',
+    title: 'Focus Left Pane',
+    shortcut: 'Ctrl+1',
+    run: () => { useBuffers.getState().setFocusedPane('primary'); },
+  });
+  register({
+    id: 'view.focusSecondaryPane',
+    title: 'Focus Right Pane',
+    shortcut: 'Ctrl+2',
+    run: () => { useBuffers.getState().setFocusedPane('secondary'); },
+  });
+
+  register({
     id: 'quickOpen.show',
     title: 'Go to File…',
     shortcut: 'Ctrl+P',

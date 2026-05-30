@@ -1,5 +1,5 @@
 import { useBuffers, type Encoding, type LineEnding } from '../stores/buffers';
-import { journalReplay, sessionLoad, openFile } from './tauri';
+import { journalReplay, sessionLoad, openFile, type SessionState } from './tauri';
 import { useWorkspace } from '../stores/workspace';
 
 function asEncoding(s: string): Encoding {
@@ -25,7 +25,13 @@ export async function bootRestore(): Promise<void> {
     }),
     sessionLoad().catch((err) => {
       console.error('session_load failed at boot:', err);
-      return { tabs: [], active_id: null, workspace_folder: null, recent_folders: [] };
+      const fallback: SessionState = {
+        tabs: [],
+        active_id: null,
+        workspace_folder: null,
+        recent_folders: [],
+      };
+      return fallback;
     }),
   ]);
 
@@ -42,9 +48,11 @@ export async function bootRestore(): Promise<void> {
   }
 
   const journalById = new Map(journalEntries.map((e) => [e.buffer_id, e]));
+  const tabById = new Map(session.tabs.map((t) => [t.buffer_id, t]));
 
   // First pass: restore dirty buffers from journals (id-preserving).
   for (const entry of journalEntries) {
+    const tab = tabById.get(entry.buffer_id);
     useBuffers.getState().openRestored({
       bufferId: entry.buffer_id,
       path: entry.snapshot.path,
@@ -52,6 +60,8 @@ export async function bootRestore(): Promise<void> {
       encoding: asEncoding(entry.snapshot.encoding),
       eol: asEol(entry.snapshot.eol),
       dirty: true,
+      cursor: tab?.cursor ?? null,
+      scrollTop: tab?.scroll_top ?? null,
     });
   }
 
@@ -70,6 +80,8 @@ export async function bootRestore(): Promise<void> {
         encoding: opened.encoding,
         eol: opened.eol,
         dirty: false,
+        cursor: tab.cursor ?? null,
+        scrollTop: tab.scroll_top ?? null,
       });
     } catch (err) {
       console.error(`bootRestore: failed to open ${tab.path}:`, err);
@@ -85,4 +97,15 @@ export async function bootRestore(): Promise<void> {
       ? session.active_id
       : state.buffers[0].id;
   useBuffers.getState().switchTo(target);
+
+  useBuffers.getState().restoreSplitState({
+    splitActive: session.split_active ?? false,
+    secondaryId: session.secondary_id ?? null,
+    focusedPane: session.focused_pane ?? 'primary',
+    secondaryPaneState: (session.secondary_pane_state ?? []).map((p) => ({
+      bufferId: p.buffer_id,
+      cursor: p.cursor ?? null,
+      scrollTop: p.scroll_top ?? null,
+    })),
+  });
 }
