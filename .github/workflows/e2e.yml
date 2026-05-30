@@ -43,7 +43,18 @@ jobs:
         run: cargo install tauri-driver --locked
 
       - name: Run e2e suite
-        run: npm run test:e2e
+        shell: bash
+        run: |
+          # `tauri build` exits non-zero in CI because the updater public key is
+          # configured but TAURI_SIGNING_PRIVATE_KEY is unset. app.exe is still
+          # produced, so tolerate that specific exit and gate the tests on the
+          # binary existing — a genuine build failure leaves no app.exe and fails
+          # here, before mocha runs. (Splitting build from `&& mocha` is why the
+          # signing error previously skipped the whole suite.)
+          rm -f src-tauri/target/release/app.exe
+          npm run tauri build || echo "tauri build exited non-zero (unsigned CI build); verifying binary"
+          test -f src-tauri/target/release/app.exe
+          npx mocha
         env:
           WEBKIT_DISABLE_COMPOSITING_MODE: 1
 
