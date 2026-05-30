@@ -39,9 +39,9 @@ describe('pane-aware routing', () => {
   }
 
   it('openBuffer routes a NEW file to the secondary pane when it is focused', () => {
-    const { a } = openTwoAndSplit();
+    const { b } = openTwoAndSplit();
     const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
-    expect(useBuffers.getState().activeId).toBe(a);       // left unchanged
+    expect(useBuffers.getState().activeId).toBe(b);       // left unchanged (split mirrors active=b)
     expect(useBuffers.getState().secondaryId).toBe(c);    // right got the new file
   });
 
@@ -58,9 +58,9 @@ describe('pane-aware routing', () => {
   });
 
   it('newBuffer routes to the secondary pane when it is focused', () => {
-    const { a } = openTwoAndSplit();
+    const { b } = openTwoAndSplit();
     const fresh = useBuffers.getState().newBuffer();
-    expect(useBuffers.getState().activeId).toBe(a);
+    expect(useBuffers.getState().activeId).toBe(b);       // left unchanged (split mirrors active=b)
     expect(useBuffers.getState().secondaryId).toBe(fresh);
   });
 
@@ -78,8 +78,19 @@ describe('pane-aware routing', () => {
     expect(useBuffers.getState().activeId).toBe(c);
     expect(useBuffers.getState().secondaryId).toBeNull();
   });
+
+  it('toggleSplit mirrors the active buffer to secondary WITHOUT changing activeId', () => {
+    useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().toggleSplit();
+    expect(useBuffers.getState().activeId).toBe(b);       // left pane stays on the active file
+    expect(useBuffers.getState().secondaryId).toBe(b);    // right mirrors it
+    expect(useBuffers.getState().focusedPane).toBe('secondary');
+  });
 });
 ```
+
+> **Note:** `toggleSplit` must NOT change `activeId` when activating the split — it mirrors the current active buffer into the secondary pane (VS Code duplicates the active editor). Do not alter `toggleSplit` to make assertions pass.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
