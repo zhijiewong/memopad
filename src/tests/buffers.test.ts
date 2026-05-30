@@ -574,6 +574,32 @@ describe('pane-aware routing', () => {
   });
 });
 
+describe('closeBuffer in split', () => {
+  beforeEach(() => useBuffers.getState().resetAll());
+
+  it('closing the secondary buffer advances it to a different remaining buffer', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    // active=a (primary), secondary=c
+    useBuffers.setState({ activeId: a, splitActive: true, secondaryId: c, focusedPane: 'secondary' });
+    useBuffers.getState().closeBuffer(c);
+    expect(useBuffers.getState().activeId).toBe(a);        // primary untouched
+    expect(useBuffers.getState().secondaryId).toBe(b);     // secondary advanced to b, not mirrored to a
+    expect(useBuffers.getState().splitActive).toBe(true);
+  });
+
+  it('closing the last remaining buffer collapses the split', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.setState({ activeId: a, splitActive: true, secondaryId: a, focusedPane: 'secondary' });
+    useBuffers.getState().closeBuffer(a);
+    expect(useBuffers.getState().activeId).toBeNull();
+    expect(useBuffers.getState().secondaryId).toBeNull();
+    expect(useBuffers.getState().splitActive).toBe(false);
+    expect(useBuffers.getState().focusedPane).toBe('primary');
+  });
+});
+
 describe('restoreSplitState', () => {
   beforeEach(() => {
     useBuffers.setState(useBuffers.getInitialState(), true);

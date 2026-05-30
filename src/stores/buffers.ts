@@ -190,20 +190,35 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       if (idx < 0) return s;
       const closed = s.buffers[idx];
       const next = s.buffers.filter((b) => b.id !== id);
+      // Index-based advance among the remaining buffers (buffer at the closed
+      // index, else the last one), or null if none remain.
+      const advance = (): string | null => {
+        if (next.length === 0) return null;
+        return idx < next.length ? next[idx].id : next[next.length - 1].id;
+      };
       let nextActive: string | null = s.activeId;
-      if (s.activeId === id) {
-        if (next.length === 0) nextActive = null;
-        else if (idx < next.length) nextActive = next[idx].id;
-        else nextActive = next[next.length - 1].id;
-      }
+      if (s.activeId === id) nextActive = advance();
       let nextSecondary: string | null = s.secondaryId;
-      if (s.secondaryId === id) {
-        nextSecondary = nextActive;
+      if (s.secondaryId === id) nextSecondary = advance();
+      let splitActive = s.splitActive;
+      let focusedPane = s.focusedPane;
+      if (next.length === 0) {
+        splitActive = false;
+        nextSecondary = null;
+        focusedPane = 'primary';
       }
       const recent = [closed, ...s.recentlyClosed].slice(0, RECENT_CAP);
       const nextPaneState = new Map(s.secondaryPaneState);
       nextPaneState.delete(id);
-      return { buffers: next, activeId: nextActive, secondaryId: nextSecondary, recentlyClosed: recent, secondaryPaneState: nextPaneState };
+      return {
+        buffers: next,
+        activeId: nextActive,
+        secondaryId: nextSecondary,
+        splitActive,
+        focusedPane,
+        recentlyClosed: recent,
+        secondaryPaneState: nextPaneState,
+      };
     });
   },
 
