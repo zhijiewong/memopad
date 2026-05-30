@@ -49,6 +49,12 @@ describe('find-in-files', () => {
       `window.__memopadTestSetWorkspace(arguments[0]); return undefined;`,
       [FIXTURE],
     );
+    await sleep(150);
+    // Sidebar defaults to the file-tree tab; switch to the search tab so the
+    // SearchPanel mounts (the real Ctrl+Shift+F flow is covered by replace-in-files).
+    await classicExecute<void>(
+      `window.__memopadShowSearchPanel && window.__memopadShowSearchPanel(); return undefined;`,
+    );
     await sleep(200);
     const panelPresent = await classicExecute<boolean>(
       `return !!document.querySelector('[data-testid="search-panel"]');`,
@@ -90,6 +96,11 @@ describe('find-in-files', () => {
       `window.__memopadTestSetWorkspace(${JSON.stringify(FIXTURE)}); return undefined;`,
     );
     await sleep(150);
+    // Switch to the search tab so the SearchPanel mounts (default is file-tree).
+    await classicExecute<void>(
+      `window.__memopadShowSearchPanel && window.__memopadShowSearchPanel(); return undefined;`,
+    );
+    await sleep(200);
     await classicExecute<void>(
       `const i = document.querySelector('[data-testid="search-input"]');
        if (i) {
@@ -118,7 +129,7 @@ describe('find-in-files', () => {
       expect(activePath).to.match(/notes\.txt|code\.rs/);
     } else {
       const titleText = await classicExecute<string>(
-        `return document.querySelector('[data-tauri-drag-region]')?.textContent || '';`,
+        `return document.querySelector('.drag-region')?.textContent || '';`,
       );
       expect(titleText).to.match(/notes\.txt|code\.rs|Untitled/);
     }

@@ -19,6 +19,12 @@ export function Sidebar({ open, onOpenFolder }: Props) {
     (window as unknown as { __memopadToggleSidebarTab?: () => void }).__memopadToggleSidebarTab = () => {
       setActiveTab((t) => (t === 'files' ? 'search' : 'files'));
     };
+    (window as unknown as { __memopadShowSearchPanel?: () => void }).__memopadShowSearchPanel = () => {
+      setActiveTab('search');
+    };
+    (window as unknown as { __memopadShowFilesPanel?: () => void }).__memopadShowFilesPanel = () => {
+      setActiveTab('files');
+    };
   }, []);
 
   if (!open) return null;

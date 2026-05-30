@@ -65,7 +65,7 @@ describe('quick open', () => {
       expect(activePath).to.match(/notes\.txt$/);
     } else {
       const hasNotes = await classicExecute<boolean>(
-        `return Array.from(document.querySelectorAll('[data-testid^="tab-"]')).some(t => (t.textContent || '').includes('notes.txt'));`,
+        `return Array.from(document.querySelectorAll('[role="tab"]')).some(t => (t.textContent || '').includes('notes.txt'));`,
       );
       expect(hasNotes).to.equal(true);
     }

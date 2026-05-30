@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-30
+
+A split-view rework that makes two-pane editing feel native: opens land in the pane
+you're looking at, the focused pane is unmistakable, and the layout survives a relaunch.
+
+### Added
+
+- **Pane-aware file open** — opening a file (Quick Open, file tree, search result) routes
+  to the **focused** pane instead of always the primary one
+- **Focused-pane indicator** — the active pane gets a clear accent border; the inactive
+  pane is dimmed
+- **`Ctrl+1` / `Ctrl+2`** — focus the primary / secondary pane; the cursor follows
+- **Split state persists across relaunch** — split layout, secondary buffer, focused pane,
+  and per-pane cursor/scroll are restored from `session.json`
+
+### Changed
+
+- **`Ctrl+\`** toggles split independently of the current layout (no longer order-sensitive)
+- Closing the last buffer in a pane falls back independently per pane
+
+### Fixed
+
+- **`Ctrl+Shift+F` now opens Find-in-files reliably.** After the file-tree sidebar landed,
+  the sidebar defaulted to the file-tree tab and `Ctrl+Shift+F` no longer switched to the
+  search tab, leaving project search unreachable. It now selects the search tab and focuses
+  the query field.
+- E2E suite restored to green (65/65) — repaired a missing `__memopadTestGetActiveBufferPath`
+  hook, stale tab/title-bar selectors, and cross-spec sidebar-state leakage in the tests.
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- No file create / rename / delete in the tree (still read-only)
+- Split view is two panes max, horizontal only
+
 ## [0.2.0] — 2026-05-29
 
 Ten v2 slices over four sessions. v2's theme is the workspace folder: every new feature operates over a persistent root opened with `Ctrl+K Ctrl+O`. Backward-compatible with v0.1.0 session.json files.

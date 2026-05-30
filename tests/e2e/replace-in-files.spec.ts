@@ -99,16 +99,17 @@ describe('replace-in-files', () => {
       `window.__memopadTestSetWorkspace(${JSON.stringify(workspace)}); return undefined;`,
     );
     await sleep(150);
-    const notesPath = path.join(workspace, 'notes.txt').replace(/\\/g, '/');
+    // Open notes.txt as a dirty buffer via the window test hooks. We can't
+    // `import('/src/stores/buffers')` here: that dev-server path 404s in the
+    // release build the e2e suite runs against. Keep native separators so the
+    // buffer path matches the search-result paths (Rust walker → backslashes on
+    // Windows); JSON.stringify escapes them safely.
+    const notesPath = path.join(workspace, 'notes.txt');
     await classicExecute<void>(
-      `(async () => {
-         const tauri = await import('@tauri-apps/api/core');
-         const opened = await tauri.invoke('open_file', { path: ${JSON.stringify(notesPath)} });
-         const buffersMod = await import('/src/stores/buffers');
-         const id = buffersMod.useBuffers.getState().openBuffer(opened);
-         buffersMod.useBuffers.getState().switchTo(id);
-         buffersMod.useBuffers.getState().setActiveContent('dirty edit');
-       })(); return undefined;`,
+      `var id = window.__memopadTestOpenBuffer({ path: ${JSON.stringify(notesPath)}, content: 'alpha', encoding: 'utf-8', eol: 'crlf' });
+       window.__memopadTestSwitchTo(id);
+       window.__memopadTestSetContent('dirty edit');
+       return undefined;`,
     );
     await sleep(400);
     await getBrowser().keys(['Control', 'Shift', 'f']);
