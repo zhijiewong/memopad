@@ -48,6 +48,8 @@ export interface EditorPaneProps {
   bufferId: string | null;
   focused: boolean;
   pane: 'primary' | 'secondary';
+  /** True when rendered as one of two split panes (enables the focus indicator). */
+  inSplit: boolean;
   onFocus: () => void;
   onActionsReady: (actions: SearchStripActions | null) => void;
   /** Called by the focused pane to open/close the search panel in the orchestrator. */
@@ -161,6 +163,12 @@ export function EditorPane(props: EditorPaneProps) {
     };
   }, [getActions]);
 
+  // When this pane becomes the focused pane (e.g. via Ctrl+1/Ctrl+2), move real
+  // DOM focus into its editor so the cursor and subsequent typing land here.
+  useEffect(() => {
+    if (props.focused) viewRef.current?.focus();
+  }, [props.focused]);
+
   // Register window globals gated on focused.
   useEffect(() => {
     if (!props.focused) return;
@@ -201,8 +209,15 @@ export function EditorPane(props: EditorPaneProps) {
     return (
       <div
         data-testid="editor-pane"
+        data-focused={props.focused}
         onMouseDown={props.onFocus}
-        className={`flex flex-1 flex-col w-full overflow-hidden ${props.focused ? '' : 'opacity-90'}`}
+        className={`flex flex-1 flex-col w-full overflow-hidden ${
+          props.inSplit
+            ? props.focused
+              ? 'ring-1 ring-inset ring-[var(--app-accent)]'
+              : 'opacity-60'
+            : ''
+        }`}
       >
         <div className="flex h-full w-full items-center justify-center text-xs" style={{ color: 'var(--app-fg-dim)' }}>
           Ctrl+O to open · Ctrl+N to start typing
@@ -214,8 +229,15 @@ export function EditorPane(props: EditorPaneProps) {
   return (
     <div
       data-testid="editor-pane"
+      data-focused={props.focused}
       onMouseDown={props.onFocus}
-      className={`flex flex-1 flex-col w-full overflow-hidden ${props.focused ? '' : 'opacity-90'}`}
+      className={`flex flex-1 flex-col w-full overflow-hidden ${
+        props.inSplit
+          ? props.focused
+            ? 'ring-1 ring-inset ring-[var(--app-accent)]'
+            : 'opacity-60'
+          : ''
+      }`}
     >
       <div className="min-h-0 flex-1 overflow-hidden">
         <CodeMirror
