@@ -88,7 +88,7 @@ describe('pane focus commands', () => {
     cmd.run();
   }
 
-  it('view.focusSecondaryPane focuses the secondary pane when split is active', () => {
+  it('focusPrimaryPane and focusSecondaryPane round-trip when split is active', () => {
     useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
     useBuffers.getState().toggleSplit();          // focusedPane becomes 'secondary'
     run('view.focusPrimaryPane');
@@ -100,6 +100,8 @@ describe('pane focus commands', () => {
   it('view.focusSecondaryPane is a no-op when not split', () => {
     useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
     run('view.focusSecondaryPane');
-    expect(useBuffers.getState().focusedPane).toBe('primary');
+    expect(useBuffers.getState().focusedPane).toBe('primary'); // secondary focus rejected when not split
+    run('view.focusPrimaryPane');
+    expect(useBuffers.getState().focusedPane).toBe('primary'); // primary focus always valid
   });
 });
