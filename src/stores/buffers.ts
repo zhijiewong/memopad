@@ -229,6 +229,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   toggleSplit: () => {
     set((s) => {
       if (!s.splitActive) {
+        if (s.activeId == null) return s; // nothing to split
         return { splitActive: true, secondaryId: s.activeId, focusedPane: 'secondary' };
       }
       return { splitActive: false, secondaryId: null, focusedPane: 'primary' };

@@ -563,6 +563,14 @@ describe('pane-aware routing', () => {
     expect(useBuffers.getState().secondaryId).toBeNull();
   });
 
+  it('toggleSplit is a no-op when no buffer is open', () => {
+    // resetAll() in beforeEach leaves zero buffers, activeId null
+    useBuffers.getState().toggleSplit();
+    expect(useBuffers.getState().splitActive).toBe(false);
+    expect(useBuffers.getState().secondaryId).toBeNull();
+    expect(useBuffers.getState().focusedPane).toBe('primary');
+  });
+
   it('reopenLastClosed routes the reopened buffer to the secondary pane when focused', () => {
     const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
     const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });

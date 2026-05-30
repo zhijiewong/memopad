@@ -168,7 +168,7 @@ export function EditorPane(props: EditorPaneProps) {
   // Only relevant in split mode; single-pane keeps native focus behavior.
   useEffect(() => {
     if (props.focused && props.inSplit) viewRef.current?.focus();
-  }, [props.focused, props.inSplit]);
+  }, [props.focused, props.inSplit, props.bufferId]);
 
   // Register window globals gated on focused.
   useEffect(() => {
