@@ -554,6 +554,24 @@ describe('pane-aware routing', () => {
     expect(useBuffers.getState().secondaryId).toBe(b);    // right mirrors it
     expect(useBuffers.getState().focusedPane).toBe('secondary');
   });
+
+  it('switchTo routes to the primary pane when not split', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().switchTo(a);
+    expect(useBuffers.getState().activeId).toBe(a);
+    expect(useBuffers.getState().secondaryId).toBeNull();
+  });
+
+  it('reopenLastClosed routes the reopened buffer to the secondary pane when focused', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().closeBuffer(b);   // active falls back to a; b -> recentlyClosed
+    useBuffers.getState().toggleSplit();    // split; secondary=a; focus secondary
+    const reopened = useBuffers.getState().reopenLastClosed();
+    expect(useBuffers.getState().secondaryId).toBe(reopened);
+    expect(useBuffers.getState().activeId).toBe(a); // left pane unchanged
+  });
 });
 
 describe('restoreSplitState', () => {
