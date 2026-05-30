@@ -598,6 +598,28 @@ describe('closeBuffer in split', () => {
     expect(useBuffers.getState().splitActive).toBe(false);
     expect(useBuffers.getState().focusedPane).toBe('primary');
   });
+
+  it('closing the active (primary) buffer advances primary, secondary untouched', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.setState({ activeId: a, splitActive: true, secondaryId: c, focusedPane: 'primary' });
+    useBuffers.getState().closeBuffer(a);
+    expect(useBuffers.getState().activeId).toBe(b);    // advanced to idx 0 of [b, c]
+    expect(useBuffers.getState().secondaryId).toBe(c); // secondary untouched
+    expect(useBuffers.getState().splitActive).toBe(true);
+  });
+
+  it('closing a background buffer leaves both panes untouched', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.setState({ activeId: a, splitActive: true, secondaryId: b, focusedPane: 'primary' });
+    useBuffers.getState().closeBuffer(c);
+    expect(useBuffers.getState().activeId).toBe(a);
+    expect(useBuffers.getState().secondaryId).toBe(b);
+    expect(useBuffers.getState().splitActive).toBe(true);
+  });
 });
 
 describe('restoreSplitState', () => {
