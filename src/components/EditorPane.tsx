@@ -165,9 +165,10 @@ export function EditorPane(props: EditorPaneProps) {
 
   // When this pane becomes the focused pane (e.g. via Ctrl+1/Ctrl+2), move real
   // DOM focus into its editor so the cursor and subsequent typing land here.
+  // Only relevant in split mode; single-pane keeps native focus behavior.
   useEffect(() => {
-    if (props.focused) viewRef.current?.focus();
-  }, [props.focused]);
+    if (props.focused && props.inSplit) viewRef.current?.focus();
+  }, [props.focused, props.inSplit]);
 
   // Register window globals gated on focused.
   useEffect(() => {
