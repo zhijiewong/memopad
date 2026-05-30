@@ -20,12 +20,11 @@ describe('split-view pane routing & focus', () => {
   });
 
   it('opens a file into the focused (right) pane and leaves the left pane unchanged', async () => {
-    const ids = await classicExecute<string[]>(`
+    await classicExecute(`
       var w = window;
       var a = w.__memopadTestOpenBuffer({ path: '/tmp/left.txt', content: 'LEFT-CONTENT', encoding: 'utf-8', eol: 'lf' });
-      var b = w.__memopadTestOpenBuffer({ path: '/tmp/mid.txt', content: 'MID-CONTENT', encoding: 'utf-8', eol: 'lf' });
+      w.__memopadTestOpenBuffer({ path: '/tmp/mid.txt', content: 'MID-CONTENT', encoding: 'utf-8', eol: 'lf' });
       w.__memopadTestSwitchTo(a);
-      return [a, b];
     `);
     await sleep(150);
 
