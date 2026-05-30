@@ -215,8 +215,8 @@ export function EditorPane(props: EditorPaneProps) {
         className={`flex flex-1 flex-col w-full overflow-hidden ${
           props.inSplit
             ? props.focused
-              ? 'ring-1 ring-inset ring-[var(--app-accent)]'
-              : 'opacity-60'
+              ? 'border-2 border-[var(--app-accent)]'
+              : 'border-2 border-transparent opacity-50'
             : ''
         }`}
       >
@@ -235,8 +235,8 @@ export function EditorPane(props: EditorPaneProps) {
       className={`flex flex-1 flex-col w-full overflow-hidden ${
         props.inSplit
           ? props.focused
-            ? 'ring-1 ring-inset ring-[var(--app-accent)]'
-            : 'opacity-60'
+            ? 'border-2 border-[var(--app-accent)]'
+            : 'border-2 border-transparent opacity-50'
           : ''
       }`}
     >
