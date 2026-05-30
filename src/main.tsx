@@ -17,6 +17,7 @@ const w = window as unknown as {
   __memopadTestCloseBuffer?: (id: string) => void;
   __memopadTestSwitchTo?: (id: string) => void;
   __memopadTestActiveId?: () => string | null;
+  __memopadTestGetActiveBufferPath?: () => string | null;
   __memopadTestTabIds?: () => string[];
   __memopadTestSetExternalChange?: (id: string, flag: boolean) => void;
   __memopadTestRecordStat?: (id: string, stat: { mtime_ms: number; size: number }) => void;
@@ -43,6 +44,7 @@ w.__memopadTestOpenBuffer = (file) => useBuffers.getState().openBuffer(file);
 w.__memopadTestCloseBuffer = (id) => useBuffers.getState().closeBuffer(id);
 w.__memopadTestSwitchTo = (id) => useBuffers.getState().switchTo(id);
 w.__memopadTestActiveId = () => useBuffers.getState().activeId;
+w.__memopadTestGetActiveBufferPath = () => selectActive(useBuffers.getState())?.path ?? null;
 w.__memopadTestTabIds = () => useBuffers.getState().buffers.map((b) => b.id);
 w.__memopadTestSetExternalChange = (id, flag) =>
   useBuffers.getState().setExternalChange(id, flag);

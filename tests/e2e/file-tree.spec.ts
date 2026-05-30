@@ -76,7 +76,7 @@ describe('file-tree', () => {
     await sleep(500);
     const activePath = await classicExecute<string | null>(
       `if (window.__memopadTestGetActiveBufferPath) return window.__memopadTestGetActiveBufferPath();
-       const titleEl = document.querySelector('[data-tauri-drag-region]');
+       const titleEl = document.querySelector('.drag-region');
        return titleEl ? titleEl.textContent : null;`,
     );
     expect(activePath ?? '').to.match(/notes\.txt/);

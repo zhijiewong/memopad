@@ -23,12 +23,19 @@ async function rectOf(selector: string): Promise<Rect | null> {
 describe('layout invariants', () => {
   beforeEach(async () => {
     await exec(() => {
-      const w = window as unknown as { __memopadTestReset: () => void };
+      const w = window as unknown as {
+        __memopadTestReset: () => void;
+        __memopadToggleSidebar?: () => void;
+      };
       w.__memopadTestReset();
+      // A prior spec may have left the sidebar open; resetAll() only clears
+      // buffers, not the sidebar. Close it so it doesn't eat the editor width.
+      const open = !!document.querySelector('[data-testid="sidebar"]');
+      if (open) w.__memopadToggleSidebar?.();
     });
   });
 
-  it('title bar spans the window width and houses 4 buttons (menu + 3 controls)', async () => {
+  it('title bar spans the window width and houses 5 buttons (menu + sidebar + 3 controls)', async () => {
     const tb = await rectOf('.drag-region');
     expect(tb).to.not.equal(null);
     expect(tb!.width).to.be.greaterThan(800);
@@ -39,8 +46,8 @@ describe('layout invariants', () => {
     const buttonCount = await classicExecute<number>(
       `return document.querySelectorAll('.drag-region button').length;`,
     );
-    // ≡ menu + min + max + close = 4
-    expect(buttonCount).to.equal(4);
+    // ≡ menu + ☰ sidebar-toggle + min + max + close = 5
+    expect(buttonCount).to.equal(5);
   });
 
   it('close button is in the top-right and clickable', async () => {

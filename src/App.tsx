@@ -152,6 +152,10 @@ export default function App() {
     (window as unknown as { __memopadToggleSidebar?: () => void }).__memopadToggleSidebar = () => setSidebarOpen((v) => !v);
     (window as unknown as { __memopadOpenSidebarAndFocusFind?: () => void }).__memopadOpenSidebarAndFocusFind = () => {
       setSidebarOpen(true);
+      // Switch to the search tab; the sidebar defaults to the file-tree tab, so
+      // without this the SearchPanel never mounts and find-in-files is unreachable.
+      (window as unknown as { __memopadShowSearchPanel?: () => void }).__memopadShowSearchPanel?.();
+      // Let the SearchPanel mount (and register its focus hook) before focusing.
       requestAnimationFrame(() => {
         (window as unknown as { __memopadFocusFindInFiles?: () => void }).__memopadFocusFindInFiles?.();
       });

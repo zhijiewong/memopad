@@ -38,6 +38,9 @@ describe('fs-watcher', () => {
       w.__memopadTestSetWorkspace?.(null as unknown as string);
       const open = !!document.querySelector('[data-testid="sidebar"]');
       if (open) w.__memopadToggleSidebar?.();
+      // A prior search-using spec may have left the sidebar on the 'search' tab;
+      // this spec needs the file tree, so force the 'files' tab.
+      (window as unknown as { __memopadShowFilesPanel?: () => void }).__memopadShowFilesPanel?.();
     });
     await sleep(150);
   });
