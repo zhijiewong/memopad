@@ -495,6 +495,58 @@ describe('openRestored cursor/scroll', () => {
   });
 });
 
+describe('pane-aware routing', () => {
+  beforeEach(() => useBuffers.getState().resetAll());
+
+  function openTwoAndSplit() {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().openBuffer({ path: '/b.txt', content: 'B', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().toggleSplit(); // splitActive=true, secondaryId=b, focusedPane='secondary'
+    return { a, b };
+  }
+
+  it('openBuffer routes a NEW file to the secondary pane when it is focused', () => {
+    const { a } = openTwoAndSplit();
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    expect(useBuffers.getState().activeId).toBe(a);       // left unchanged
+    expect(useBuffers.getState().secondaryId).toBe(c);    // right got the new file
+  });
+
+  it('openBuffer routes an EXISTING file to the secondary pane when it is focused', () => {
+    const { a } = openTwoAndSplit();
+    useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    expect(useBuffers.getState().secondaryId).toBe(a);
+  });
+
+  it('switchTo routes to the secondary pane when it is focused', () => {
+    const { a } = openTwoAndSplit();
+    useBuffers.getState().switchTo(a);
+    expect(useBuffers.getState().secondaryId).toBe(a);
+  });
+
+  it('newBuffer routes to the secondary pane when it is focused', () => {
+    const { a } = openTwoAndSplit();
+    const fresh = useBuffers.getState().newBuffer();
+    expect(useBuffers.getState().activeId).toBe(a);
+    expect(useBuffers.getState().secondaryId).toBe(fresh);
+  });
+
+  it('routes to the PRIMARY pane when primary is focused', () => {
+    openTwoAndSplit();
+    useBuffers.getState().setFocusedPane('primary');
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    expect(useBuffers.getState().activeId).toBe(c);
+  });
+
+  it('routes to the PRIMARY pane when not split', () => {
+    const a = useBuffers.getState().openBuffer({ path: '/a.txt', content: 'A', encoding: 'utf-8', eol: 'lf' });
+    expect(a).toBe(useBuffers.getState().activeId);
+    const c = useBuffers.getState().openBuffer({ path: '/c.txt', content: 'C', encoding: 'utf-8', eol: 'lf' });
+    expect(useBuffers.getState().activeId).toBe(c);
+    expect(useBuffers.getState().secondaryId).toBeNull();
+  });
+});
+
 describe('restoreSplitState', () => {
   beforeEach(() => {
     useBuffers.setState(useBuffers.getInitialState(), true);

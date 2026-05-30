@@ -117,6 +117,17 @@ function emptyBuffer(): Buffer {
   };
 }
 
+/**
+ * Route a "show this buffer" action to the focused pane: the secondary pane
+ * when the split is active and focused, otherwise the primary pane.
+ */
+function routeToFocusedPane(s: BuffersState, id: string): Partial<BuffersState> {
+  if (s.splitActive && s.focusedPane === 'secondary') {
+    return { secondaryId: id };
+  }
+  return { activeId: id };
+}
+
 export const useBuffers = create<BuffersState>((set, get) => ({
   buffers: [],
   activeId: null,
@@ -128,14 +139,14 @@ export const useBuffers = create<BuffersState>((set, get) => ({
 
   newBuffer: () => {
     const buf = emptyBuffer();
-    set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
+    set((s) => ({ buffers: [...s.buffers, buf], ...routeToFocusedPane(s, buf.id) }));
     return buf.id;
   },
 
   openBuffer: (file) => {
     const existing = get().buffers.find((b) => b.path === file.path);
     if (existing) {
-      set({ activeId: existing.id });
+      set((s) => routeToFocusedPane(s, existing.id));
       return existing.id;
     }
     const buf: Buffer = {
@@ -151,7 +162,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
       cursor: null,
       scrollTop: null,
     };
-    set((s) => ({ buffers: [...s.buffers, buf], activeId: buf.id }));
+    set((s) => ({ buffers: [...s.buffers, buf], ...routeToFocusedPane(s, buf.id) }));
     return buf.id;
   },
 
@@ -197,13 +208,16 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   },
 
   switchTo: (id) => {
-    set((s) => (s.buffers.some((b) => b.id === id) ? { activeId: id } : s));
+    set((s) => (s.buffers.some((b) => b.id === id) ? routeToFocusedPane(s, id) : s));
   },
 
   toggleSplit: () => {
     set((s) => {
       if (!s.splitActive) {
-        return { splitActive: true, secondaryId: s.activeId, focusedPane: 'secondary' };
+        // Move current active to secondary; primary shows the preceding buffer (if any).
+        const idx = s.activeId == null ? -1 : s.buffers.findIndex((b) => b.id === s.activeId);
+        const prevId = idx > 0 ? s.buffers[idx - 1].id : s.activeId;
+        return { splitActive: true, secondaryId: s.activeId, activeId: prevId, focusedPane: 'secondary' };
       }
       return { splitActive: false, secondaryId: null, focusedPane: 'primary' };
     });
@@ -314,8 +328,8 @@ export const useBuffers = create<BuffersState>((set, get) => ({
     const restored: Buffer = { ...restoredOrig, id: genId() };
     set((s) => ({
       buffers: [...s.buffers, restored],
-      activeId: restored.id,
       recentlyClosed: rest,
+      ...routeToFocusedPane(s, restored.id),
     }));
     return restored.id;
   },
@@ -416,7 +430,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   openFileAtLine(path, line, range, _snippet) {
     const existing = get().buffers.find((b) => b.path === path);
     if (existing) {
-      set({ activeId: existing.id });
+      set((s) => routeToFocusedPane(s, existing.id));
     } else {
       (window as unknown as { __memopadPendingJump?: { path: string; line: number; range: [number, number] } }).__memopadPendingJump = { path, line, range };
     }
