@@ -11,16 +11,22 @@ describe('window close', () => {
     await classicExecute<string>(
       `document.querySelector('button[aria-label="Close"]').click(); return 'clicked';`,
     );
-    // Wait for the close to propagate.
-    await new Promise((r) => setTimeout(r, 1500));
 
-    // Now try to interact with the session. If the window closed, this should throw.
-    let stillAlive = false;
-    try {
-      await getBrowser().getTitle();
-      stillAlive = true;
-    } catch {
-      stillAlive = false;
+    // Poll for the window to tear down instead of assuming a fixed delay:
+    // window.destroy() teardown timing varies and is slow on loaded CI runners,
+    // so a single check after 1500ms was flaky. The session dies once the window
+    // is gone, so getTitle() throwing is our "closed" signal.
+    let stillAlive = true;
+    const deadlineMs = 10_000;
+    const start = Date.now();
+    while (Date.now() - start < deadlineMs) {
+      try {
+        await getBrowser().getTitle();
+        await new Promise((r) => setTimeout(r, 250));
+      } catch {
+        stillAlive = false;
+        break;
+      }
     }
     expect(stillAlive, 'window should have closed').to.equal(false);
   });
