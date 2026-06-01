@@ -3,6 +3,7 @@ import { useWorkspace } from '../stores/workspace';
 import { useBuffers } from '../stores/buffers';
 import { openFile as openFileIpc, type DirEntry, revealInExplorer } from '../lib/tauri';
 import { TabContextMenu, type TabContextMenuItem } from './TabContextMenu';
+import { InlineEditRow } from './InlineEditRow';
 import { relativeToWorkspace } from '../lib/path';
 
 interface Props {
@@ -15,12 +16,18 @@ export function TreeNode({ entry, depth }: Props) {
   const childrenByPath = useWorkspace((s) => s.childrenByPath);
   const loadingByPath = useWorkspace((s) => s.loadingByPath);
   const toggleExpand = useWorkspace((s) => s.toggleExpand);
+  const editState = useWorkspace((s) => s.editState);
+  const setEditState = useWorkspace((s) => s.setEditState);
+  const setPendingDelete = useWorkspace((s) => s.setPendingDelete);
 
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
 
   const isOpen = expanded.has(entry.path);
   const kids = childrenByPath.get(entry.path);
   const isLoading = loadingByPath.has(entry.path);
+
+  const isRenaming = editState?.mode === 'rename' && editState.path === entry.path;
+  const isCreateHere = editState?.mode === 'create' && editState.parent === entry.path;
 
   const onClick = async () => {
     if (entry.is_dir) {
@@ -40,53 +47,88 @@ export function TreeNode({ entry, depth }: Props) {
     }
   };
 
-  function buildMenuItems(path: string): TabContextMenuItem[] {
+  async function beginCreate(isDir: boolean) {
+    if (!expanded.has(entry.path)) await toggleExpand(entry.path);
+    setEditState({ mode: 'create', parent: entry.path, isDir });
+  }
+
+  function buildMenuItems(): TabContextMenuItem[] {
     const workspaceFolder = useWorkspace.getState().workspaceFolder ?? '';
-    return [
-      {
-        label: 'Reveal in Explorer',
-        enabled: true,
-        onClick: () => { revealInExplorer(path).catch((err) => console.error('reveal:', err)); },
+    const items: TabContextMenuItem[] = [];
+    if (entry.is_dir) {
+      items.push({ label: 'New File', enabled: true, onClick: () => { void beginCreate(false); } });
+      items.push({ label: 'New Folder', enabled: true, onClick: () => { void beginCreate(true); } });
+    }
+    items.push({ label: 'Rename', enabled: true, onClick: () => setEditState({ mode: 'rename', path: entry.path }) });
+    items.push({ label: 'Delete', enabled: true, onClick: () => setPendingDelete(entry) });
+    items.push({
+      label: 'Reveal in Explorer', enabled: true,
+      onClick: () => { revealInExplorer(entry.path).catch((err) => console.error('reveal:', err)); },
+    });
+    items.push({
+      label: 'Copy Path', enabled: true,
+      onClick: () => { navigator.clipboard.writeText(entry.path).catch((err) => console.error('clipboard:', err)); },
+    });
+    items.push({
+      label: 'Copy Relative Path', enabled: workspaceFolder !== '',
+      onClick: () => {
+        const rel = relativeToWorkspace(entry.path, workspaceFolder);
+        navigator.clipboard.writeText(rel).catch((err) => console.error('clipboard:', err));
       },
-      {
-        label: 'Copy Path',
-        enabled: true,
-        onClick: () => { navigator.clipboard.writeText(path).catch((err) => console.error('clipboard:', err)); },
-      },
-      {
-        label: 'Copy Relative Path',
-        enabled: workspaceFolder !== '',
-        onClick: () => {
-          const rel = relativeToWorkspace(path, workspaceFolder);
-          navigator.clipboard.writeText(rel).catch((err) => console.error('clipboard:', err));
-        },
-      },
-    ];
+    });
+    return items;
   }
 
   return (
     <>
-      <button
-        type="button"
-        data-testid="tree-row"
-        data-depth={depth}
-        data-is-dir={entry.is_dir}
-        onClick={onClick}
-        onContextMenu={(e) => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); }}
-        title={entry.path}
-        className="block w-full cursor-pointer truncate text-left text-xs text-neutral-300 hover:bg-neutral-800"
-        style={{ paddingLeft: `${depth * 12 + 6}px`, paddingTop: 2, paddingBottom: 2 }}
-      >
-        <span className="mr-1 inline-block w-3 text-neutral-500">
-          {entry.is_dir ? (isOpen ? '▾' : '▸') : ''}
-        </span>
-        <span className="text-neutral-500">
-          {entry.is_dir ? '📁' : '📄'}
-        </span>
-        <span className="ml-1">{entry.name}</span>
-      </button>
+      {isRenaming ? (
+        <InlineEditRow
+          depth={depth}
+          isDir={entry.is_dir}
+          initialValue={entry.name}
+          onCommit={async (name) => {
+            await useWorkspace.getState().renameEntry(entry.path, name);
+            setEditState(null);
+          }}
+          onCancel={() => setEditState(null)}
+        />
+      ) : (
+        <button
+          type="button"
+          data-testid="tree-row"
+          data-depth={depth}
+          data-is-dir={entry.is_dir}
+          onClick={onClick}
+          onContextMenu={(e) => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); }}
+          onKeyDown={(e) => {
+            if (e.key === 'F2') { e.preventDefault(); setEditState({ mode: 'rename', path: entry.path }); }
+            else if (e.key === 'Delete') { e.preventDefault(); setPendingDelete(entry); }
+          }}
+          title={entry.path}
+          className="block w-full cursor-pointer truncate text-left text-xs text-neutral-300 hover:bg-neutral-800"
+          style={{ paddingLeft: `${depth * 12 + 6}px`, paddingTop: 2, paddingBottom: 2 }}
+        >
+          <span className="mr-1 inline-block w-3 text-neutral-500">
+            {entry.is_dir ? (isOpen ? '▾' : '▸') : ''}
+          </span>
+          <span className="text-neutral-500">{entry.is_dir ? '📁' : '📄'}</span>
+          <span className="ml-1">{entry.name}</span>
+        </button>
+      )}
       {entry.is_dir && isOpen && (
         <>
+          {isCreateHere && editState?.mode === 'create' && (
+            <InlineEditRow
+              depth={depth + 1}
+              isDir={editState.isDir}
+              initialValue=""
+              onCommit={async (name) => {
+                await useWorkspace.getState().createEntry(entry.path, name, editState.isDir);
+                setEditState(null);
+              }}
+              onCancel={() => setEditState(null)}
+            />
+          )}
           {isLoading && !kids && (
             <div
               data-testid="tree-loading"
@@ -105,7 +147,7 @@ export function TreeNode({ entry, depth }: Props) {
         <TabContextMenu
           x={menuPos.x}
           y={menuPos.y}
-          items={buildMenuItems(entry.path)}
+          items={buildMenuItems()}
           onClose={() => setMenuPos(null)}
         />
       )}
