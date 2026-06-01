@@ -3,6 +3,7 @@ import { useBuffers, selectFocused, type Encoding, type LineEnding } from '../st
 import { EncodingPopover } from './EncodingPopover';
 import { EolPopover } from './EolPopover';
 import { useEditorPrefs } from '../stores/editorPrefs';
+import { useCursorPos } from '../stores/cursorPos';
 
 function encodingLabel(e: Encoding): string {
   switch (e) {
@@ -33,6 +34,8 @@ export function StatusBar() {
   const setActiveEol = useBuffers((s) => s.setActiveEol);
   const wordWrap = useEditorPrefs((s) => s.wordWrap);
   const toggleWordWrap = useEditorPrefs((s) => s.toggleWordWrap);
+  const line = useCursorPos((s) => s.line);
+  const col = useCursorPos((s) => s.col);
 
   const [encRect, setEncRect] = useState<DOMRect | null>(null);
   const [eolRect, setEolRect] = useState<DOMRect | null>(null);
@@ -46,6 +49,8 @@ export function StatusBar() {
       className="flex h-6 select-none items-center gap-3 border-t px-3 text-[11px]"
       style={{ borderColor: 'var(--app-border)', background: 'var(--app-bg)', color: 'var(--app-fg-muted)' }}
     >
+      <span data-status-segment="cursor">Ln {line}, Col {col}</span>
+
       <span data-status-segment="language">{languageLabel(active.path)}</span>
 
       <button
