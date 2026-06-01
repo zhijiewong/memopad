@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-01
+
+Cursor navigation: always know where the caret is, and jump anywhere by line number.
+
+### Added
+
+- **Ln/Col indicator** — the status bar shows the focused editor's caret position
+  (`Ln x, Col y`, 1-based).
+- **Go to Line** — `Ctrl+G` (or the command palette, "Edit: Go to Line") opens a dialog
+  to jump the caret to a line number; out-of-range values clamp to the nearest line.
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- Column counts characters (a tab is one column), not visual width
+- Split view is two panes max, horizontal only
+
 ## [0.5.0] — 2026-06-01
 
 Editor view polish: soft word wrap and indentation guides, both global and

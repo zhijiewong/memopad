@@ -16,6 +16,7 @@ import { useEditorPrefs } from '../stores/editorPrefs';
 import { useBuffers, selectPaneState } from '../stores/buffers';
 import { languageForPath } from '../lib/language';
 import { useTheme, effectiveTheme } from '../stores/theme';
+import { useCursorPos } from '../stores/cursorPos';
 import { memopadDark } from '../editor/memopad-dark';
 import { memopadLight } from '../editor/memopad-light';
 import { type SearchStripActions } from './SearchStrip';
@@ -44,6 +45,8 @@ declare global {
     /** Test-only: run replaceAll on the CM view. */
     runReplaceAll: () => number;
   } | undefined;
+  // eslint-disable-next-line no-var
+  var __memopadGotoLine: ((n: number) => void) | undefined;
 }
 
 export interface EditorPaneProps {
@@ -174,6 +177,22 @@ export function EditorPane(props: EditorPaneProps) {
     if (props.focused && props.inSplit) viewRef.current?.focus();
   }, [props.focused, props.inSplit, props.bufferId]);
 
+  // Keep the status-bar Ln/Col in sync when this pane gains focus or swaps
+  // buffers. onUpdate only fires on selection/geometry change, so without this
+  // the indicator would show a stale position after a pane switch (Ctrl+1/2) or
+  // a tab change that didn't move the caret.
+  useEffect(() => {
+    if (!props.focused) return;
+    const v = viewRef.current;
+    if (!v || props.bufferId == null) {
+      useCursorPos.getState().set(1, 1);
+      return;
+    }
+    const head = v.state.selection.main.head;
+    const headLine = v.state.doc.lineAt(head);
+    useCursorPos.getState().set(headLine.number, head - headLine.from + 1);
+  }, [props.focused, props.bufferId]);
+
   // Register window globals gated on focused.
   useEffect(() => {
     if (!props.focused) return;
@@ -199,8 +218,21 @@ export function EditorPane(props: EditorPaneProps) {
         return before;
       },
     };
+    globalThis.__memopadGotoLine = (n: number) => {
+      const v = viewRef.current;
+      if (!v) return;
+      const total = v.state.doc.lines;
+      const line = Math.max(1, Math.min(n, total));
+      const pos = v.state.doc.line(line).from;
+      v.dispatch({
+        selection: { anchor: pos, head: pos },
+        effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+      });
+      v.focus();
+    };
     return () => {
       globalThis.__memopadSearchPanel = undefined;
+      globalThis.__memopadGotoLine = undefined;
     };
   }, [props.focused]);
 
@@ -277,6 +309,10 @@ export function EditorPane(props: EditorPaneProps) {
             const head = viewUpdate.state.selection.main.head;
             const scrollTop = viewUpdate.view.scrollDOM.scrollTop;
             persistCursor(head, scrollTop);
+            if (props.focused) {
+              const headLine = viewUpdate.state.doc.lineAt(head);
+              useCursorPos.getState().set(headLine.number, head - headLine.from + 1);
+            }
           }}
           basicSetup={{
             lineNumbers: true,
