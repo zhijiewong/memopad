@@ -45,13 +45,23 @@ describe('editor prefs', () => {
     expect(off, 'wrap should be off again').to.equal(false);
   });
 
-  it('indent guides command flips the prefs store', async () => {
+  it('indent guides toggle adds/removes the cm-indent-markers DOM', async () => {
+    // Nested indentation so the extension definitely renders guide markers.
+    await classicExecute<void>(
+      `window.__memopadTestSetContent('function a() {\\n    if (x) {\\n        y();\\n    }\\n}'); return undefined;`,
+    );
+    await sleep(200);
+
     const before = await classicExecute<boolean>(`return window.__memopadTestEditorPrefs().indentGuides;`);
     expect(before, 'guides on by default').to.equal(true);
+    const onMarkers = await classicExecute<number>(`return document.querySelectorAll('.cm-indent-markers').length;`);
+    expect(onMarkers, 'markers render when guides on').to.be.greaterThan(0);
 
     await classicExecute<void>(`window.__memopadTestRunCommand('view.toggleIndentGuides'); return undefined;`);
-    await sleep(150);
+    await sleep(200);
     const after = await classicExecute<boolean>(`return window.__memopadTestEditorPrefs().indentGuides;`);
     expect(after, 'guides off after toggle').to.equal(false);
+    const offMarkers = await classicExecute<number>(`return document.querySelectorAll('.cm-indent-markers').length;`);
+    expect(offMarkers, 'markers gone when guides off').to.equal(0);
   });
 });
