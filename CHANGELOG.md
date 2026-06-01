@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-01
+
+The file tree becomes editable: create, rename, and delete files and folders without
+leaving Memopad.
+
+### Added
+
+- **New File / New Folder** — via the file-tree header buttons (at the workspace root) or
+  the right-click menu on any folder; inline name entry with duplicate/invalid-name feedback
+- **Rename** — `F2` or the right-click menu; inline edit. Open buffers follow the rename
+  (including buffers under a renamed folder)
+- **Delete to Recycle Bin** — `Delete` key or the right-click menu, with a confirm dialog.
+  Deletions are recoverable from the Windows Recycle Bin
+
+### Changed
+
+- Deleting a file closes its editor tab only if the buffer is clean; a buffer with unsaved
+  edits stays open so nothing is lost (saving re-creates the file)
+
+### Fixed
+
+- (none)
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- Rename is same-directory only (no move); no drag-to-move, multi-select, or cut/copy/paste
+- Split view is two panes max, horizontal only
+
 ## [0.3.0] — 2026-05-30
 
 A split-view rework that makes two-pane editing feel native: opens land in the pane
