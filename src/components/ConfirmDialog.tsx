@@ -13,13 +13,15 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
 
   useEffect(() => {
     confirmRef.current?.focus();
+    // Enter is handled by the focused confirm button's native activation — do
+    // NOT also bind Enter here, or onConfirm fires twice (global listener +
+    // native button click). The global listener only owns Escape.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
-      else if (e.key === 'Enter') onConfirm();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onConfirm, onCancel]);
+  }, [onCancel]);
 
   return (
     <div

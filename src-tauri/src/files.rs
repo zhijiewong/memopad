@@ -9,10 +9,27 @@ use serde::{Deserialize, Serialize};
 
 const RESERVED_CHARS: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
+/// Windows reserved device names (case-insensitive, matched against the stem
+/// before the first `.`). Creating these fails at the OS level with a confusing
+/// "Access is denied" error, so reject them up front.
+const RESERVED_NAMES: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
 /// Validate a bare filename: non-empty, not "." / "..", no path separators,
-/// no Windows-reserved characters.
+/// no Windows-reserved characters, not a reserved device name, and no trailing
+/// dot or space (Windows silently strips those).
 pub fn is_valid_filename(name: &str) -> bool {
     if name.is_empty() || name == "." || name == ".." {
+        return false;
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        return false;
+    }
+    let stem = name.split('.').next().unwrap_or("");
+    if RESERVED_NAMES.iter().any(|r| r.eq_ignore_ascii_case(stem)) {
         return false;
     }
     !name.chars().any(|c| RESERVED_CHARS.contains(&c))
@@ -386,6 +403,21 @@ mod tests {
         assert!(!is_valid_filename("a\\b"));
         for bad in ["a<b", "a>b", "a:b", "a\"b", "a|b", "a?b", "a*b"] {
             assert!(!is_valid_filename(bad), "{bad} should be rejected");
+        }
+    }
+
+    #[test]
+    fn rejects_windows_reserved_names_and_trailing() {
+        // Reserved device names (case-insensitive), with or without extension.
+        for bad in ["CON", "nul", "Aux", "COM1", "LPT9", "con.txt", "NUL.md"] {
+            assert!(!is_valid_filename(bad), "{bad} should be rejected");
+        }
+        // Trailing dot or space (Windows silently strips these).
+        assert!(!is_valid_filename("file."));
+        assert!(!is_valid_filename("file "));
+        // Names that merely *contain* a reserved stem are fine.
+        for ok in ["console.txt", "com10", "lpt", "a.CON", "contract.md"] {
+            assert!(is_valid_filename(ok), "{ok} should be accepted");
         }
     }
 
