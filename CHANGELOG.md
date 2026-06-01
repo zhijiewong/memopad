@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-01
+
+Line editing shortcuts surfaced and rounded out.
+
+### Added
+
+- **`Ctrl+D` duplicates the current line.**
+- **Command-palette entries** for line operations: Move Line Up (`Alt+↑`), Move Line
+  Down (`Alt+↓`), Duplicate Line (`Ctrl+D`), Delete Line (`Ctrl+Shift+K`) — the
+  `Alt`-based moves, `Ctrl+Alt+↑/↓` copy, and `Ctrl+Shift+K` delete were already
+  available; they're now discoverable.
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- Split view is two panes max, horizontal only
+
 ## [0.6.0] — 2026-06-01
 
 Cursor navigation: always know where the caret is, and jump anywhere by line number.

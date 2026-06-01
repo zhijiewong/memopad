@@ -182,6 +182,31 @@ export function registerBuiltins() {
   });
 
   register({
+    id: 'edit.moveLineUp',
+    title: 'Edit: Move Line Up',
+    shortcut: 'Alt+Up',
+    run: () => globalThis.__memopadLineCommand?.('moveUp'),
+  });
+  register({
+    id: 'edit.moveLineDown',
+    title: 'Edit: Move Line Down',
+    shortcut: 'Alt+Down',
+    run: () => globalThis.__memopadLineCommand?.('moveDown'),
+  });
+  register({
+    id: 'edit.duplicateLine',
+    title: 'Edit: Duplicate Line',
+    shortcut: 'Ctrl+D',
+    run: () => globalThis.__memopadLineCommand?.('duplicate'),
+  });
+  register({
+    id: 'edit.deleteLine',
+    title: 'Edit: Delete Line',
+    shortcut: 'Ctrl+Shift+K',
+    run: () => globalThis.__memopadLineCommand?.('delete'),
+  });
+
+  register({
     id: 'workspace.openFolder',
     title: 'Open Folder…',
     run: () => {

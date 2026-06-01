@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
-import { EditorView } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
 import {
   SearchQuery,
   setSearchQuery as cmSetSearchQuery,
@@ -11,6 +11,8 @@ import {
   getSearchQuery,
   search,
 } from '@codemirror/search';
+import { Prec } from '@codemirror/state';
+import { moveLineUp, moveLineDown, copyLineDown, deleteLine } from '@codemirror/commands';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import { useEditorPrefs } from '../stores/editorPrefs';
 import { useBuffers, selectPaneState } from '../stores/buffers';
@@ -47,6 +49,8 @@ declare global {
   } | undefined;
   // eslint-disable-next-line no-var
   var __memopadGotoLine: ((n: number) => void) | undefined;
+  // eslint-disable-next-line no-var
+  var __memopadLineCommand: ((cmd: 'moveUp' | 'moveDown' | 'duplicate' | 'delete') => void) | undefined;
 }
 
 export interface EditorPaneProps {
@@ -230,9 +234,20 @@ export function EditorPane(props: EditorPaneProps) {
       });
       v.focus();
     };
+    globalThis.__memopadLineCommand = (cmd) => {
+      const v = viewRef.current;
+      if (!v) return;
+      const fn = cmd === 'moveUp' ? moveLineUp
+        : cmd === 'moveDown' ? moveLineDown
+        : cmd === 'duplicate' ? copyLineDown
+        : deleteLine;
+      fn(v);
+      v.focus();
+    };
     return () => {
       globalThis.__memopadSearchPanel = undefined;
       globalThis.__memopadGotoLine = undefined;
+      globalThis.__memopadLineCommand = undefined;
     };
   }, [props.focused]);
 
@@ -286,6 +301,7 @@ export function EditorPane(props: EditorPaneProps) {
             editorTheme,
             themeExt,
             search(),
+            Prec.high(keymap.of([{ key: 'Mod-d', run: copyLineDown, preventDefault: true }])),
             ...(wordWrap ? [EditorView.lineWrapping] : []),
             ...(indentGuides ? [indentationMarkers()] : []),
             ...languageForPath(buffer.path),
