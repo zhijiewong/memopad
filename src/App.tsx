@@ -4,11 +4,12 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { Editor } from './components/Editor';
 import { CommandPalette } from './components/CommandPalette';
 import { QuickOpenPalette } from './components/QuickOpenPalette';
+import { GoToLineDialog } from './components/GoToLineDialog';
 import { StatusBar } from './components/StatusBar';
 import { Sidebar } from './components/Sidebar';
 import { useCommands } from './commands/registry';
 import { registerBuiltins, registerRecentFolderCommands } from './commands/builtins';
-import { useBuffers } from './stores/buffers';
+import { useBuffers, selectFocused } from './stores/buffers';
 import { useTheme, effectiveTheme } from './stores/theme';
 import { useWorkspace } from './stores/workspace';
 import { useEditorPrefs } from './stores/editorPrefs';
@@ -90,6 +91,7 @@ export default function App() {
   const [quickOpenShown, setQuickOpenShown] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [presetQuery, setPresetQuery] = useState('');
+  const [gotoLineOpen, setGotoLineOpen] = useState(false);
 
   const themeMode = useTheme((s) => s.mode);
   useEffect(() => {
@@ -172,6 +174,9 @@ export default function App() {
       setPaletteOpen(true);
     };
     (window as unknown as { __memopadShowQuickOpen?: () => void }).__memopadShowQuickOpen = () => setQuickOpenShown(true);
+    (window as unknown as { __memopadOpenGotoLine?: () => void }).__memopadOpenGotoLine = () => {
+      if (selectFocused(useBuffers.getState())) setGotoLineOpen(true);
+    };
   }, []);
 
   useEffect(() => {
@@ -186,6 +191,11 @@ export default function App() {
       if (!mod) return;
       const key = e.key.toLowerCase();
 
+      if (key === 'g' && !e.shiftKey) {
+        e.preventDefault();
+        (window as unknown as { __memopadOpenGotoLine?: () => void }).__memopadOpenGotoLine?.();
+        return;
+      }
       if (key === 'b' && !e.shiftKey) { e.preventDefault(); setSidebarOpen((v) => !v); return; }
       if (key === '1' && !e.shiftKey) { e.preventDefault(); runCommand('view.focusPrimaryPane'); return; }
       if (key === '2' && !e.shiftKey) { e.preventDefault(); runCommand('view.focusSecondaryPane'); return; }
@@ -262,6 +272,9 @@ export default function App() {
       )}
       {quickOpenShown && (
         <QuickOpenPalette onClose={() => setQuickOpenShown(false)} />
+      )}
+      {gotoLineOpen && (
+        <GoToLineDialog onClose={() => setGotoLineOpen(false)} />
       )}
     </div>
   );
