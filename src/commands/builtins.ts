@@ -174,6 +174,12 @@ export function registerBuiltins() {
     shortcut: 'Ctrl+H',
     run: () => globalThis.__memopadSearchPanel?.open('replace'),
   });
+  register({
+    id: 'edit.gotoLine',
+    title: 'Edit: Go to Line',
+    shortcut: 'Ctrl+G',
+    run: () => (window as unknown as { __memopadOpenGotoLine?: () => void }).__memopadOpenGotoLine?.(),
+  });
 
   register({
     id: 'workspace.openFolder',
