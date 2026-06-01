@@ -7,6 +7,17 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+const RESERVED_CHARS: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
+
+/// Validate a bare filename: non-empty, not "." / "..", no path separators,
+/// no Windows-reserved characters.
+pub fn is_valid_filename(name: &str) -> bool {
+    if name.is_empty() || name == "." || name == ".." {
+        return false;
+    }
+    !name.chars().any(|c| RESERVED_CHARS.contains(&c))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirEntry {
     pub name: String,
@@ -18,6 +29,9 @@ pub struct DirEntry {
 pub enum FilesError {
     PathMissing,
     NotADirectory,
+    AlreadyExists,
+    InvalidName,
+    Trash(String),
     Io(std::io::Error),
 }
 
@@ -26,6 +40,9 @@ impl std::fmt::Display for FilesError {
         match self {
             FilesError::PathMissing => write!(f, "Folder no longer accessible"),
             FilesError::NotADirectory => write!(f, "Path is not a directory"),
+            FilesError::AlreadyExists => write!(f, "A file or folder with that name already exists"),
+            FilesError::InvalidName => write!(f, "Invalid name"),
+            FilesError::Trash(m) => write!(f, "Could not move to Recycle Bin: {}", m),
             FilesError::Io(e) => write!(f, "{}", e),
         }
     }
@@ -75,13 +92,19 @@ pub fn list_dir(path: &Path) -> Result<Vec<DirEntry>, FilesError> {
     Ok(entries)
 }
 
-/// Public: validate that `path` is under `workspace`, then list it.
-pub fn list_dir_under(workspace: &Path, path: &Path) -> Result<Vec<DirEntry>, FilesError> {
+/// Canonicalize `path` and confirm it resolves under `workspace`.
+fn resolve_under(workspace: &Path, path: &Path) -> Result<std::path::PathBuf, FilesError> {
     let ws_canon = workspace.canonicalize().map_err(|_| FilesError::PathMissing)?;
     let path_canon = path.canonicalize().map_err(|_| FilesError::PathMissing)?;
     if !path_canon.starts_with(&ws_canon) {
         return Err(FilesError::PathMissing);
     }
+    Ok(path_canon)
+}
+
+/// Public: validate that `path` is under `workspace`, then list it.
+pub fn list_dir_under(workspace: &Path, path: &Path) -> Result<Vec<DirEntry>, FilesError> {
+    let path_canon = resolve_under(workspace, path)?;
     list_dir(&path_canon)
 }
 
@@ -277,6 +300,40 @@ mod tests {
             .join("|");
         assert!(names_concat.contains("src/main.rs"), "got {:?}", resp.files);
         assert!(!names_concat.contains("target/build.log"), "target/ should be filtered, got {:?}", resp.files);
+    }
+
+    #[test]
+    fn valid_filenames_accepted() {
+        assert!(is_valid_filename("notes.txt"));
+        assert!(is_valid_filename("My File-2 (1).md"));
+    }
+
+    #[test]
+    fn invalid_filenames_rejected() {
+        assert!(!is_valid_filename(""));
+        assert!(!is_valid_filename("."));
+        assert!(!is_valid_filename(".."));
+        assert!(!is_valid_filename("a/b"));
+        assert!(!is_valid_filename("a\\b"));
+        for bad in ["a<b", "a>b", "a:b", "a\"b", "a|b", "a?b", "a*b"] {
+            assert!(!is_valid_filename(bad), "{bad} should be rejected");
+        }
+    }
+
+    #[test]
+    fn resolve_under_rejects_escape() {
+        let ws = tmp("ru_ws");
+        let outside = tmp("ru_out");
+        assert!(resolve_under(&ws, &outside).is_err());
+    }
+
+    #[test]
+    fn resolve_under_accepts_child() {
+        let ws = tmp("ru_child");
+        touch(&ws, "a.txt");
+        let child = ws.join("a.txt");
+        let resolved = resolve_under(&ws, &child).unwrap();
+        assert!(resolved.ends_with("a.txt"));
     }
 
     #[test]
