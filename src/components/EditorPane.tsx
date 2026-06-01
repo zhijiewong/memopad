@@ -11,6 +11,8 @@ import {
   getSearchQuery,
   search,
 } from '@codemirror/search';
+import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+import { useEditorPrefs } from '../stores/editorPrefs';
 import { useBuffers, selectPaneState } from '../stores/buffers';
 import { languageForPath } from '../lib/language';
 import { useTheme, effectiveTheme } from '../stores/theme';
@@ -68,6 +70,8 @@ export function EditorPane(props: EditorPaneProps) {
   const setActiveContent = useBuffers((s) => s.setActiveContent);
   const themeMode = useTheme((s) => s.mode);
   const themeExt = effectiveTheme(themeMode) === 'dark' ? memopadDark : memopadLight;
+  const wordWrap = useEditorPrefs((s) => s.wordWrap);
+  const indentGuides = useEditorPrefs((s) => s.indentGuides);
 
   const viewRef = useRef<EditorView | null>(null);
 
@@ -250,6 +254,8 @@ export function EditorPane(props: EditorPaneProps) {
             editorTheme,
             themeExt,
             search(),
+            ...(wordWrap ? [EditorView.lineWrapping] : []),
+            ...(indentGuides ? [indentationMarkers()] : []),
             ...languageForPath(buffer.path),
           ]}
           onChange={setActiveContent}

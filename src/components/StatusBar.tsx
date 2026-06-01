@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useBuffers, selectFocused, type Encoding, type LineEnding } from '../stores/buffers';
 import { EncodingPopover } from './EncodingPopover';
 import { EolPopover } from './EolPopover';
+import { useEditorPrefs } from '../stores/editorPrefs';
 
 function encodingLabel(e: Encoding): string {
   switch (e) {
@@ -30,6 +31,8 @@ export function StatusBar() {
   const active = useBuffers(selectFocused);
   const setActiveEncoding = useBuffers((s) => s.setActiveEncoding);
   const setActiveEol = useBuffers((s) => s.setActiveEol);
+  const wordWrap = useEditorPrefs((s) => s.wordWrap);
+  const toggleWordWrap = useEditorPrefs((s) => s.toggleWordWrap);
 
   const [encRect, setEncRect] = useState<DOMRect | null>(null);
   const [eolRect, setEolRect] = useState<DOMRect | null>(null);
@@ -61,6 +64,16 @@ export function StatusBar() {
         className="hover:text-neutral-100"
       >
         {eolLabel(active.eol)}
+      </button>
+
+      <button
+        type="button"
+        data-status-segment="wordwrap"
+        onClick={() => toggleWordWrap()}
+        className={wordWrap ? 'text-neutral-100' : 'opacity-50 hover:opacity-100'}
+        title="Toggle Word Wrap (Alt+Z)"
+      >
+        Wrap
       </button>
 
       {encRect && (

@@ -3,6 +3,7 @@ import { openFile, saveFile, revealInExplorer } from '../lib/tauri';
 import { pickFileToOpen, pickFileToSave } from '../lib/dialog';
 import { useCommands } from './registry';
 import { useTheme } from '../stores/theme';
+import { useEditorPrefs } from '../stores/editorPrefs';
 
 async function doOpen() {
   const path = await pickFileToOpen();
@@ -147,6 +148,18 @@ export function registerBuiltins() {
     id: 'theme.system',
     title: 'View: Use System Theme',
     run: () => useTheme.getState().set('system'),
+  });
+
+  register({
+    id: 'view.toggleWordWrap',
+    title: 'View: Toggle Word Wrap',
+    shortcut: 'Alt+Z',
+    run: () => useEditorPrefs.getState().toggleWordWrap(),
+  });
+  register({
+    id: 'view.toggleIndentGuides',
+    title: 'View: Toggle Indent Guides',
+    run: () => useEditorPrefs.getState().toggleIndentGuides(),
   });
 
   register({

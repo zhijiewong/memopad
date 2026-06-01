@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { useBuffers, selectActive } from './stores/buffers';
+import { useEditorPrefs } from './stores/editorPrefs';
 
 const w = window as unknown as {
   __memopadTestSetContent?: (s: string) => void;
@@ -34,6 +35,8 @@ const w = window as unknown as {
     secondaryId: string | null;
     focusedPane: 'primary' | 'secondary';
   };
+  __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean };
+  __memopadTestResetEditorPrefs?: () => void;
 };
 
 w.__memopadTestSetContent = (s) => useBuffers.getState().setActiveContent(s);
@@ -58,6 +61,11 @@ w.__memopadTestSplitState = () => {
   const s = useBuffers.getState();
   return { splitActive: s.splitActive, secondaryId: s.secondaryId, focusedPane: s.focusedPane };
 };
+w.__memopadTestEditorPrefs = () => ({
+  wordWrap: useEditorPrefs.getState().wordWrap,
+  indentGuides: useEditorPrefs.getState().indentGuides,
+});
+w.__memopadTestResetEditorPrefs = () => useEditorPrefs.getState().reset();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

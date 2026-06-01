@@ -1,6 +1,7 @@
 import { useBuffers, type Encoding, type LineEnding } from '../stores/buffers';
 import { journalReplay, sessionLoad, openFile, type SessionState } from './tauri';
 import { useWorkspace } from '../stores/workspace';
+import { useEditorPrefs } from '../stores/editorPrefs';
 
 function asEncoding(s: string): Encoding {
   if (s === 'utf-8' || s === 'utf-8-bom' || s === 'utf-16-le' || s === 'utf-16-be') return s;
@@ -9,6 +10,14 @@ function asEncoding(s: string): Encoding {
 function asEol(s: string): LineEnding {
   if (s === 'lf' || s === 'crlf' || s === 'cr') return s;
   return 'lf';
+}
+
+/** Apply persisted editor prefs from a loaded session; null/absent keeps store defaults. */
+export function applyEditorPrefsFromSession(
+  session: { word_wrap?: boolean | null; indent_guides?: boolean | null },
+): void {
+  if (session.word_wrap != null) useEditorPrefs.getState().setWordWrap(session.word_wrap);
+  if (session.indent_guides != null) useEditorPrefs.getState().setIndentGuides(session.indent_guides);
 }
 
 /**
@@ -36,6 +45,8 @@ export async function bootRestore(): Promise<void> {
   ]);
 
   useWorkspace.getState().setFolder(session.workspace_folder ?? null);
+
+  applyEditorPrefsFromSession(session);
 
   const fromSession = session.recent_folders ?? [];
   const wf = session.workspace_folder;
