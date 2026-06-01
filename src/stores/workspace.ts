@@ -38,7 +38,17 @@ interface WorkspaceState {
   createEntry: (parentPath: string, name: string, isDir: boolean) => Promise<DirEntry>;
   renameEntry: (path: string, newName: string) => Promise<string>;
   deleteEntry: (path: string) => Promise<void>;
+
+  editState: TreeEditState;
+  setEditState: (e: TreeEditState) => void;
+  pendingDelete: DirEntry | null;
+  setPendingDelete: (e: DirEntry | null) => void;
 }
+
+export type TreeEditState =
+  | { mode: 'rename'; path: string }
+  | { mode: 'create'; parent: string; isDir: boolean }
+  | null;
 
 /** The parent directory of an absolute path (handles both separators). */
 function parentOf(p: string): string {
@@ -59,6 +69,11 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   loadingByPath: new Set<string>(),
   recentFolders: [],
   watcherError: null,
+  editState: null,
+  pendingDelete: null,
+
+  setEditState(e) { set({ editState: e }); },
+  setPendingDelete(e) { set({ pendingDelete: e }); },
 
   setWatcherError(msg) {
     set({ watcherError: msg });
