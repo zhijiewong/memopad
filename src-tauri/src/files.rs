@@ -108,6 +108,48 @@ pub fn list_dir_under(workspace: &Path, path: &Path) -> Result<Vec<DirEntry>, Fi
     list_dir(&path_canon)
 }
 
+/// Create an empty file named `name` inside `parent` (which must be under `workspace`).
+pub fn create_file(workspace: &Path, parent: &Path, name: &str) -> Result<DirEntry, FilesError> {
+    if !is_valid_filename(name) {
+        return Err(FilesError::InvalidName);
+    }
+    let parent_canon = resolve_under(workspace, parent)?;
+    if !parent_canon.is_dir() {
+        return Err(FilesError::NotADirectory);
+    }
+    let target = parent_canon.join(name);
+    if target.exists() {
+        return Err(FilesError::AlreadyExists);
+    }
+    std::fs::File::create(&target)?;
+    Ok(DirEntry {
+        name: name.to_string(),
+        path: target.to_string_lossy().to_string(),
+        is_dir: false,
+    })
+}
+
+/// Create a directory named `name` inside `parent` (which must be under `workspace`).
+pub fn create_dir(workspace: &Path, parent: &Path, name: &str) -> Result<DirEntry, FilesError> {
+    if !is_valid_filename(name) {
+        return Err(FilesError::InvalidName);
+    }
+    let parent_canon = resolve_under(workspace, parent)?;
+    if !parent_canon.is_dir() {
+        return Err(FilesError::NotADirectory);
+    }
+    let target = parent_canon.join(name);
+    if target.exists() {
+        return Err(FilesError::AlreadyExists);
+    }
+    std::fs::create_dir(&target)?;
+    Ok(DirEntry {
+        name: name.to_string(),
+        path: target.to_string_lossy().to_string(),
+        is_dir: true,
+    })
+}
+
 pub const MAX_QUICK_OPEN_FILES: usize = 10_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -334,6 +376,46 @@ mod tests {
         let child = ws.join("a.txt");
         let resolved = resolve_under(&ws, &child).unwrap();
         assert!(resolved.ends_with("a.txt"));
+    }
+
+    #[test]
+    fn create_file_creates_empty_file() {
+        let ws = tmp("cf");
+        let entry = create_file(&ws, &ws, "new.txt").unwrap();
+        assert_eq!(entry.name, "new.txt");
+        assert_eq!(entry.is_dir, false);
+        assert!(ws.join("new.txt").is_file());
+    }
+
+    #[test]
+    fn create_dir_creates_folder() {
+        let ws = tmp("cd");
+        let entry = create_dir(&ws, &ws, "sub").unwrap();
+        assert_eq!(entry.is_dir, true);
+        assert!(ws.join("sub").is_dir());
+    }
+
+    #[test]
+    fn create_file_rejects_duplicate() {
+        let ws = tmp("cf_dup");
+        touch(&ws, "dup.txt");
+        let err = create_file(&ws, &ws, "dup.txt").unwrap_err();
+        matches!(err, FilesError::AlreadyExists).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn create_file_rejects_invalid_name() {
+        let ws = tmp("cf_inv");
+        let err = create_file(&ws, &ws, "a/b.txt").unwrap_err();
+        matches!(err, FilesError::InvalidName).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn create_file_rejects_parent_outside_workspace() {
+        let ws = tmp("cf_ws");
+        let outside = tmp("cf_out");
+        let err = create_file(&ws, &outside, "x.txt").unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
     }
 
     #[test]
