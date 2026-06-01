@@ -46,9 +46,12 @@ describe('file-tree context menu', () => {
     const items = await classicExecute<string[]>(
       `return Array.from(document.querySelectorAll('[role="menuitem"]')).map(b => b.textContent || '');`,
     );
-    expect(items.length).to.equal(3);
-    expect(items[0]).to.match(/Reveal in Explorer/);
-    expect(items[1]).to.match(/Copy Path/);
-    expect(items[2]).to.match(/Copy Relative Path/);
+    // File row menu: Rename, Delete, Reveal in Explorer, Copy Path, Copy Relative Path.
+    expect(items.length).to.equal(5);
+    expect(items[0]).to.match(/Rename/);
+    expect(items[1]).to.match(/Delete/);
+    expect(items[2]).to.match(/Reveal in Explorer/);
+    expect(items[3]).to.match(/Copy Path/);
+    expect(items[4]).to.match(/Copy Relative Path/);
   });
 });
