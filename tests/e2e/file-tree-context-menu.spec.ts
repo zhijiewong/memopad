@@ -22,7 +22,7 @@ describe('file-tree context menu', () => {
     await sleep(150);
   });
 
-  it('right-click on a tree row opens a 3-item menu', async () => {
+  it('right-click on a tree row opens a 5-item menu', async () => {
     await getBrowser().keys(['Control', 'b']);
     await sleep(150);
     await classicExecute<void>(
