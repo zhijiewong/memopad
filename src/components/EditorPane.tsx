@@ -177,6 +177,22 @@ export function EditorPane(props: EditorPaneProps) {
     if (props.focused && props.inSplit) viewRef.current?.focus();
   }, [props.focused, props.inSplit, props.bufferId]);
 
+  // Keep the status-bar Ln/Col in sync when this pane gains focus or swaps
+  // buffers. onUpdate only fires on selection/geometry change, so without this
+  // the indicator would show a stale position after a pane switch (Ctrl+1/2) or
+  // a tab change that didn't move the caret.
+  useEffect(() => {
+    if (!props.focused) return;
+    const v = viewRef.current;
+    if (!v || props.bufferId == null) {
+      useCursorPos.getState().set(1, 1);
+      return;
+    }
+    const head = v.state.selection.main.head;
+    const headLine = v.state.doc.lineAt(head);
+    useCursorPos.getState().set(headLine.number, head - headLine.from + 1);
+  }, [props.focused, props.bufferId]);
+
   // Register window globals gated on focused.
   useEffect(() => {
     if (!props.focused) return;

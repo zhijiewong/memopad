@@ -43,4 +43,20 @@ describe('cursor navigation', () => {
     );
     expect(pos.line, 'caret clamps to line 10').to.equal(10);
   });
+
+  it('resets the indicator when a new buffer becomes active', async () => {
+    // Move into the document, then open a fresh buffer — the indicator must not
+    // keep showing the previous buffer's line.
+    await classicExecute<void>(`window.__memopadGotoLine(8); return undefined;`);
+    await sleep(200);
+    expect((await classicExecute<{ line: number }>(`return window.__memopadTestCursorPos();`)).line).to.equal(8);
+
+    await classicExecute<void>(`window.__memopadTestNewBuffer(); return undefined;`);
+    await sleep(250);
+    const pos = await classicExecute<{ line: number; col: number }>(
+      `return window.__memopadTestCursorPos();`,
+    );
+    expect(pos.line, 'indicator resets to line 1 for the new buffer').to.equal(1);
+    expect(pos.col).to.equal(1);
+  });
 });

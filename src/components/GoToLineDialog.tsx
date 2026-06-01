@@ -18,7 +18,12 @@ export function GoToLineDialog({ onClose }: Props) {
   useEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
-  }, []);
+    // Escape closes regardless of where focus is (matches ConfirmDialog). Enter
+    // stays input-only so it can't double-fire commit.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   function commit() {
     const line = parseGotoLine(value, totalLines);
@@ -46,7 +51,6 @@ export function GoToLineDialog({ onClose }: Props) {
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') { e.preventDefault(); commit(); }
-            else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
           }}
           className="w-full rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-neutral-100 outline-none focus:border-blue-500"
         />
