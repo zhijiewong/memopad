@@ -169,6 +169,28 @@ export async function listDir(workspaceFolder: string, path: string): Promise<Di
   return invoke<DirEntry[]>('list_dir', { workspaceFolder, path });
 }
 
+export async function createFile(
+  workspaceFolder: string, parent: string, name: string,
+): Promise<DirEntry> {
+  return invoke<DirEntry>('create_file', { workspaceFolder, parent, name });
+}
+
+export async function createDir(
+  workspaceFolder: string, parent: string, name: string,
+): Promise<DirEntry> {
+  return invoke<DirEntry>('create_dir', { workspaceFolder, parent, name });
+}
+
+export async function renamePath(
+  workspaceFolder: string, path: string, newName: string,
+): Promise<string> {
+  return invoke<string>('rename_path', { workspaceFolder, path, newName });
+}
+
+export async function deletePath(workspaceFolder: string, path: string): Promise<void> {
+  return invoke<void>('delete_path', { workspaceFolder, path });
+}
+
 export interface FileResult {
   path: string;
   matches_replaced: number;
