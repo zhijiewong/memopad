@@ -7,6 +7,34 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+const RESERVED_CHARS: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
+
+/// Windows reserved device names (case-insensitive, matched against the stem
+/// before the first `.`). Creating these fails at the OS level with a confusing
+/// "Access is denied" error, so reject them up front.
+const RESERVED_NAMES: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+/// Validate a bare filename: non-empty, not "." / "..", no path separators,
+/// no Windows-reserved characters, not a reserved device name, and no trailing
+/// dot or space (Windows silently strips those).
+pub fn is_valid_filename(name: &str) -> bool {
+    if name.is_empty() || name == "." || name == ".." {
+        return false;
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        return false;
+    }
+    let stem = name.split('.').next().unwrap_or("");
+    if RESERVED_NAMES.iter().any(|r| r.eq_ignore_ascii_case(stem)) {
+        return false;
+    }
+    !name.chars().any(|c| RESERVED_CHARS.contains(&c))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirEntry {
     pub name: String,
@@ -18,6 +46,9 @@ pub struct DirEntry {
 pub enum FilesError {
     PathMissing,
     NotADirectory,
+    AlreadyExists,
+    InvalidName,
+    Trash(String),
     Io(std::io::Error),
 }
 
@@ -26,6 +57,9 @@ impl std::fmt::Display for FilesError {
         match self {
             FilesError::PathMissing => write!(f, "Folder no longer accessible"),
             FilesError::NotADirectory => write!(f, "Path is not a directory"),
+            FilesError::AlreadyExists => write!(f, "A file or folder with that name already exists"),
+            FilesError::InvalidName => write!(f, "Invalid name"),
+            FilesError::Trash(m) => write!(f, "Could not move to Recycle Bin: {}", m),
             FilesError::Io(e) => write!(f, "{}", e),
         }
     }
@@ -75,14 +109,89 @@ pub fn list_dir(path: &Path) -> Result<Vec<DirEntry>, FilesError> {
     Ok(entries)
 }
 
-/// Public: validate that `path` is under `workspace`, then list it.
-pub fn list_dir_under(workspace: &Path, path: &Path) -> Result<Vec<DirEntry>, FilesError> {
+/// Canonicalize `path` and confirm it resolves under `workspace`.
+fn resolve_under(workspace: &Path, path: &Path) -> Result<std::path::PathBuf, FilesError> {
     let ws_canon = workspace.canonicalize().map_err(|_| FilesError::PathMissing)?;
     let path_canon = path.canonicalize().map_err(|_| FilesError::PathMissing)?;
     if !path_canon.starts_with(&ws_canon) {
         return Err(FilesError::PathMissing);
     }
+    Ok(path_canon)
+}
+
+/// Public: validate that `path` is under `workspace`, then list it.
+pub fn list_dir_under(workspace: &Path, path: &Path) -> Result<Vec<DirEntry>, FilesError> {
+    let path_canon = resolve_under(workspace, path)?;
     list_dir(&path_canon)
+}
+
+/// Create an empty file named `name` inside `parent` (which must be under `workspace`).
+pub fn create_file(workspace: &Path, parent: &Path, name: &str) -> Result<DirEntry, FilesError> {
+    if !is_valid_filename(name) {
+        return Err(FilesError::InvalidName);
+    }
+    let parent_canon = resolve_under(workspace, parent)?;
+    if !parent_canon.is_dir() {
+        return Err(FilesError::NotADirectory);
+    }
+    let target = parent_canon.join(name);
+    if target.exists() {
+        return Err(FilesError::AlreadyExists);
+    }
+    std::fs::File::create(&target)?;
+    Ok(DirEntry {
+        name: name.to_string(),
+        path: target.to_string_lossy().to_string(),
+        is_dir: false,
+    })
+}
+
+/// Create a directory named `name` inside `parent` (which must be under `workspace`).
+pub fn create_dir(workspace: &Path, parent: &Path, name: &str) -> Result<DirEntry, FilesError> {
+    if !is_valid_filename(name) {
+        return Err(FilesError::InvalidName);
+    }
+    let parent_canon = resolve_under(workspace, parent)?;
+    if !parent_canon.is_dir() {
+        return Err(FilesError::NotADirectory);
+    }
+    let target = parent_canon.join(name);
+    if target.exists() {
+        return Err(FilesError::AlreadyExists);
+    }
+    std::fs::create_dir(&target)?;
+    Ok(DirEntry {
+        name: name.to_string(),
+        path: target.to_string_lossy().to_string(),
+        is_dir: true,
+    })
+}
+
+/// Rename the entry at `path` to `new_name`, staying in the same parent directory.
+/// Returns the new absolute path. Allows a case-only rename (Windows-insensitive fs)
+/// but rejects collision with a *different* existing entry.
+pub fn rename_entry(workspace: &Path, path: &Path, new_name: &str) -> Result<String, FilesError> {
+    if !is_valid_filename(new_name) {
+        return Err(FilesError::InvalidName);
+    }
+    let path_canon = resolve_under(workspace, path)?;
+    let parent = path_canon.parent().ok_or(FilesError::PathMissing)?;
+    let target = parent.join(new_name);
+    if target.exists() {
+        // The only acceptable "exists" is the source itself differing only by case.
+        let same = target.canonicalize().ok().as_deref() == Some(path_canon.as_path());
+        if !same {
+            return Err(FilesError::AlreadyExists);
+        }
+    }
+    std::fs::rename(&path_canon, &target)?;
+    Ok(target.to_string_lossy().to_string())
+}
+
+/// Move the entry at `path` to the OS Recycle Bin / Trash.
+pub fn delete_entry(workspace: &Path, path: &Path) -> Result<(), FilesError> {
+    let path_canon = resolve_under(workspace, path)?;
+    trash::delete(&path_canon).map_err(|e| FilesError::Trash(e.to_string()))
 }
 
 pub const MAX_QUICK_OPEN_FILES: usize = 10_000;
@@ -277,6 +386,147 @@ mod tests {
             .join("|");
         assert!(names_concat.contains("src/main.rs"), "got {:?}", resp.files);
         assert!(!names_concat.contains("target/build.log"), "target/ should be filtered, got {:?}", resp.files);
+    }
+
+    #[test]
+    fn valid_filenames_accepted() {
+        assert!(is_valid_filename("notes.txt"));
+        assert!(is_valid_filename("My File-2 (1).md"));
+    }
+
+    #[test]
+    fn invalid_filenames_rejected() {
+        assert!(!is_valid_filename(""));
+        assert!(!is_valid_filename("."));
+        assert!(!is_valid_filename(".."));
+        assert!(!is_valid_filename("a/b"));
+        assert!(!is_valid_filename("a\\b"));
+        for bad in ["a<b", "a>b", "a:b", "a\"b", "a|b", "a?b", "a*b"] {
+            assert!(!is_valid_filename(bad), "{bad} should be rejected");
+        }
+    }
+
+    #[test]
+    fn rejects_windows_reserved_names_and_trailing() {
+        // Reserved device names (case-insensitive), with or without extension.
+        for bad in ["CON", "nul", "Aux", "COM1", "LPT9", "con.txt", "NUL.md"] {
+            assert!(!is_valid_filename(bad), "{bad} should be rejected");
+        }
+        // Trailing dot or space (Windows silently strips these).
+        assert!(!is_valid_filename("file."));
+        assert!(!is_valid_filename("file "));
+        // Names that merely *contain* a reserved stem are fine.
+        for ok in ["console.txt", "com10", "lpt", "a.CON", "contract.md"] {
+            assert!(is_valid_filename(ok), "{ok} should be accepted");
+        }
+    }
+
+    #[test]
+    fn resolve_under_rejects_escape() {
+        let ws = tmp("ru_ws");
+        let outside = tmp("ru_out");
+        assert!(resolve_under(&ws, &outside).is_err());
+    }
+
+    #[test]
+    fn resolve_under_accepts_child() {
+        let ws = tmp("ru_child");
+        touch(&ws, "a.txt");
+        let child = ws.join("a.txt");
+        let resolved = resolve_under(&ws, &child).unwrap();
+        assert!(resolved.ends_with("a.txt"));
+    }
+
+    #[test]
+    fn create_file_creates_empty_file() {
+        let ws = tmp("cf");
+        let entry = create_file(&ws, &ws, "new.txt").unwrap();
+        assert_eq!(entry.name, "new.txt");
+        assert_eq!(entry.is_dir, false);
+        assert!(ws.join("new.txt").is_file());
+    }
+
+    #[test]
+    fn create_dir_creates_folder() {
+        let ws = tmp("cd");
+        let entry = create_dir(&ws, &ws, "sub").unwrap();
+        assert_eq!(entry.is_dir, true);
+        assert!(ws.join("sub").is_dir());
+    }
+
+    #[test]
+    fn create_file_rejects_duplicate() {
+        let ws = tmp("cf_dup");
+        touch(&ws, "dup.txt");
+        let err = create_file(&ws, &ws, "dup.txt").unwrap_err();
+        matches!(err, FilesError::AlreadyExists).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn create_file_rejects_invalid_name() {
+        let ws = tmp("cf_inv");
+        let err = create_file(&ws, &ws, "a/b.txt").unwrap_err();
+        matches!(err, FilesError::InvalidName).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn create_file_rejects_parent_outside_workspace() {
+        let ws = tmp("cf_ws");
+        let outside = tmp("cf_out");
+        let err = create_file(&ws, &outside, "x.txt").unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn rename_entry_renames_file() {
+        let ws = tmp("rn");
+        touch(&ws, "old.txt");
+        let new_path = rename_entry(&ws, &ws.join("old.txt"), "new.txt").unwrap();
+        assert!(new_path.ends_with("new.txt"));
+        assert!(!ws.join("old.txt").exists());
+        assert!(ws.join("new.txt").is_file());
+    }
+
+    #[test]
+    fn rename_entry_rejects_existing_target() {
+        let ws = tmp("rn_dup");
+        touch(&ws, "a.txt");
+        touch(&ws, "b.txt");
+        let err = rename_entry(&ws, &ws.join("a.txt"), "b.txt").unwrap_err();
+        matches!(err, FilesError::AlreadyExists).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn rename_entry_rejects_invalid_name() {
+        let ws = tmp("rn_inv");
+        touch(&ws, "a.txt");
+        let err = rename_entry(&ws, &ws.join("a.txt"), "x/y.txt").unwrap_err();
+        matches!(err, FilesError::InvalidName).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn rename_entry_rejects_path_outside_workspace() {
+        let ws = tmp("rn_ws");
+        let outside = tmp("rn_out");
+        touch(&outside, "a.txt");
+        let err = rename_entry(&ws, &outside.join("a.txt"), "b.txt").unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn delete_entry_rejects_path_outside_workspace() {
+        let ws = tmp("del_ws");
+        let outside = tmp("del_out");
+        touch(&outside, "a.txt");
+        let err = delete_entry(&ws, &outside.join("a.txt")).unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn delete_entry_rejects_missing_path() {
+        let ws = tmp("del_missing");
+        let err = delete_entry(&ws, &ws.join("nope.txt")).unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
     }
 
     #[test]

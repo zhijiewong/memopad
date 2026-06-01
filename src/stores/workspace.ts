@@ -35,6 +35,25 @@ interface WorkspaceState {
   refreshSubtree: (path: string) => Promise<void>;
   replaceInFiles: (replacement: string) => Promise<ReplaceResponse>;
   clearTreeCache: () => void;
+  createEntry: (parentPath: string, name: string, isDir: boolean) => Promise<DirEntry>;
+  renameEntry: (path: string, newName: string) => Promise<string>;
+  deleteEntry: (path: string) => Promise<void>;
+
+  editState: TreeEditState;
+  setEditState: (e: TreeEditState) => void;
+  pendingDelete: DirEntry | null;
+  setPendingDelete: (e: DirEntry | null) => void;
+}
+
+export type TreeEditState =
+  | { mode: 'rename'; path: string }
+  | { mode: 'create'; parent: string; isDir: boolean }
+  | null;
+
+/** The parent directory of an absolute path (handles both separators). */
+function parentOf(p: string): string {
+  const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+  return idx <= 0 ? p : p.slice(0, idx);
 }
 
 export const useWorkspace = create<WorkspaceState>((set, get) => ({
@@ -50,6 +69,11 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   loadingByPath: new Set<string>(),
   recentFolders: [],
   watcherError: null,
+  editState: null,
+  pendingDelete: null,
+
+  setEditState(e) { set({ editState: e }); },
+  setPendingDelete(e) { set({ pendingDelete: e }); },
 
   setWatcherError(msg) {
     set({ watcherError: msg });
@@ -185,6 +209,43 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     }
 
     return resp;
+  },
+
+  async createEntry(parentPath, name, isDir) {
+    const folder = get().workspaceFolder;
+    if (!folder) throw new Error('No workspace open');
+    const { createFile, createDir } = await import('../lib/tauri');
+    const entry = isDir
+      ? await createDir(folder, parentPath, name)
+      : await createFile(folder, parentPath, name);
+    if (!get().expanded.has(parentPath)) {
+      const next = new Set(get().expanded);
+      next.add(parentPath);
+      set({ expanded: next });
+    }
+    await get().refreshSubtree(parentPath);
+    return entry;
+  },
+
+  async renameEntry(path, newName) {
+    const folder = get().workspaceFolder;
+    if (!folder) throw new Error('No workspace open');
+    const { renamePath } = await import('../lib/tauri');
+    const newPath = await renamePath(folder, path, newName);
+    await get().refreshSubtree(parentOf(path));
+    const { useBuffers } = await import('./buffers');
+    useBuffers.getState().renamePath(path, newPath);
+    return newPath;
+  },
+
+  async deleteEntry(path) {
+    const folder = get().workspaceFolder;
+    if (!folder) throw new Error('No workspace open');
+    const { deletePath } = await import('../lib/tauri');
+    await deletePath(folder, path);
+    const { useBuffers } = await import('./buffers');
+    useBuffers.getState().handleDeletedPath(path);
+    await get().refreshSubtree(parentOf(path));
   },
 
   clearTreeCache() {

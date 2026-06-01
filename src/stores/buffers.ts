@@ -85,6 +85,8 @@ interface BuffersState {
   setSecondaryCursor: (bufferId: string, cursor: number | null) => void;
   setSecondaryScrollTop: (bufferId: string, scrollTop: number | null) => void;
   replaceBuffer: (id: string, next: ReplaceBufferInput) => void;
+  renamePath: (oldPath: string, newPath: string) => void;
+  handleDeletedPath: (deletedPath: string) => void;
   reloadIfOpen: (path: string) => Promise<void>;
   resetAll: () => void;
   openFileAtLine: (
@@ -407,6 +409,36 @@ export const useBuffers = create<BuffersState>((set, get) => ({
           : b,
       ),
     }));
+  },
+
+  renamePath: (oldPath, newPath) => {
+    const norm = (p: string) => p.replace(/\\/g, '/').toLowerCase();
+    const oldNorm = norm(oldPath);
+    const oldPrefix = oldNorm + '/';
+    set((s) => ({
+      buffers: s.buffers.map((b) => {
+        if (b.path == null) return b;
+        const bn = norm(b.path);
+        if (bn === oldNorm) return { ...b, path: newPath };
+        if (bn.startsWith(oldPrefix)) {
+          // Folder rename: keep the remainder (with its original separators).
+          return { ...b, path: newPath + b.path.slice(oldPath.length) };
+        }
+        return b;
+      }),
+    }));
+  },
+
+  handleDeletedPath: (deletedPath) => {
+    const norm = (p: string) => p.replace(/\\/g, '/').toLowerCase();
+    const dn = norm(deletedPath);
+    const prefix = dn + '/';
+    const toClose = get().buffers.filter((b) => {
+      if (b.path == null) return false;
+      const bn = norm(b.path);
+      return (bn === dn || bn.startsWith(prefix)) && !b.dirty;
+    });
+    for (const b of toClose) get().closeBuffer(b.id);
   },
 
   async reloadIfOpen(path) {
