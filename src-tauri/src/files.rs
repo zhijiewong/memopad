@@ -150,6 +150,27 @@ pub fn create_dir(workspace: &Path, parent: &Path, name: &str) -> Result<DirEntr
     })
 }
 
+/// Rename the entry at `path` to `new_name`, staying in the same parent directory.
+/// Returns the new absolute path. Allows a case-only rename (Windows-insensitive fs)
+/// but rejects collision with a *different* existing entry.
+pub fn rename_entry(workspace: &Path, path: &Path, new_name: &str) -> Result<String, FilesError> {
+    if !is_valid_filename(new_name) {
+        return Err(FilesError::InvalidName);
+    }
+    let path_canon = resolve_under(workspace, path)?;
+    let parent = path_canon.parent().ok_or(FilesError::PathMissing)?;
+    let target = parent.join(new_name);
+    if target.exists() {
+        // The only acceptable "exists" is the source itself differing only by case.
+        let same = target.canonicalize().ok().as_deref() == Some(path_canon.as_path());
+        if !same {
+            return Err(FilesError::AlreadyExists);
+        }
+    }
+    std::fs::rename(&path_canon, &target)?;
+    Ok(target.to_string_lossy().to_string())
+}
+
 pub const MAX_QUICK_OPEN_FILES: usize = 10_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -415,6 +436,42 @@ mod tests {
         let ws = tmp("cf_ws");
         let outside = tmp("cf_out");
         let err = create_file(&ws, &outside, "x.txt").unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn rename_entry_renames_file() {
+        let ws = tmp("rn");
+        touch(&ws, "old.txt");
+        let new_path = rename_entry(&ws, &ws.join("old.txt"), "new.txt").unwrap();
+        assert!(new_path.ends_with("new.txt"));
+        assert!(!ws.join("old.txt").exists());
+        assert!(ws.join("new.txt").is_file());
+    }
+
+    #[test]
+    fn rename_entry_rejects_existing_target() {
+        let ws = tmp("rn_dup");
+        touch(&ws, "a.txt");
+        touch(&ws, "b.txt");
+        let err = rename_entry(&ws, &ws.join("a.txt"), "b.txt").unwrap_err();
+        matches!(err, FilesError::AlreadyExists).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn rename_entry_rejects_invalid_name() {
+        let ws = tmp("rn_inv");
+        touch(&ws, "a.txt");
+        let err = rename_entry(&ws, &ws.join("a.txt"), "x/y.txt").unwrap_err();
+        matches!(err, FilesError::InvalidName).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn rename_entry_rejects_path_outside_workspace() {
+        let ws = tmp("rn_ws");
+        let outside = tmp("rn_out");
+        touch(&outside, "a.txt");
+        let err = rename_entry(&ws, &outside.join("a.txt"), "b.txt").unwrap_err();
         matches!(err, FilesError::PathMissing).then_some(()).unwrap();
     }
 
