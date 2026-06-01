@@ -171,6 +171,12 @@ pub fn rename_entry(workspace: &Path, path: &Path, new_name: &str) -> Result<Str
     Ok(target.to_string_lossy().to_string())
 }
 
+/// Move the entry at `path` to the OS Recycle Bin / Trash.
+pub fn delete_entry(workspace: &Path, path: &Path) -> Result<(), FilesError> {
+    let path_canon = resolve_under(workspace, path)?;
+    trash::delete(&path_canon).map_err(|e| FilesError::Trash(e.to_string()))
+}
+
 pub const MAX_QUICK_OPEN_FILES: usize = 10_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -472,6 +478,22 @@ mod tests {
         let outside = tmp("rn_out");
         touch(&outside, "a.txt");
         let err = rename_entry(&ws, &outside.join("a.txt"), "b.txt").unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn delete_entry_rejects_path_outside_workspace() {
+        let ws = tmp("del_ws");
+        let outside = tmp("del_out");
+        touch(&outside, "a.txt");
+        let err = delete_entry(&ws, &outside.join("a.txt")).unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn delete_entry_rejects_missing_path() {
+        let ws = tmp("del_missing");
+        let err = delete_entry(&ws, &ws.join("nope.txt")).unwrap_err();
         matches!(err, FilesError::PathMissing).then_some(()).unwrap();
     }
 
