@@ -68,6 +68,8 @@ export interface SessionState {
   secondary_id?: string | null;
   focused_pane?: 'primary' | 'secondary';
   secondary_pane_state?: PaneCursor[];
+  word_wrap?: boolean | null;
+  indent_guides?: boolean | null;
 }
 
 export interface FileStat {

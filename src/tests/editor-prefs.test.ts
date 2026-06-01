@@ -34,3 +34,24 @@ describe('useEditorPrefs', () => {
     expect(useEditorPrefs.getState().indentGuides).toBe(true);
   });
 });
+
+import { vi } from 'vitest';
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+
+import { applyEditorPrefsFromSession } from '../lib/boot';
+
+describe('editor prefs session restore', () => {
+  beforeEach(() => useEditorPrefs.getState().reset());
+
+  it('applies non-null flags from session', () => {
+    applyEditorPrefsFromSession({ word_wrap: true, indent_guides: false });
+    expect(useEditorPrefs.getState().wordWrap).toBe(true);
+    expect(useEditorPrefs.getState().indentGuides).toBe(false);
+  });
+
+  it('leaves defaults when fields are absent/null', () => {
+    applyEditorPrefsFromSession({});
+    expect(useEditorPrefs.getState().wordWrap).toBe(false);
+    expect(useEditorPrefs.getState().indentGuides).toBe(true);
+  });
+});

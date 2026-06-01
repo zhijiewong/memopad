@@ -11,6 +11,7 @@ import { registerBuiltins, registerRecentFolderCommands } from './commands/built
 import { useBuffers } from './stores/buffers';
 import { useTheme, effectiveTheme } from './stores/theme';
 import { useWorkspace } from './stores/workspace';
+import { useEditorPrefs } from './stores/editorPrefs';
 import { startJournalDebounce } from './lib/journal-debounce';
 import { startFsWatcher, stopFsWatcher } from './lib/fs-watcher';
 import { bootRestore } from './lib/boot';
@@ -47,6 +48,8 @@ function persistSession() {
     secondary_pane_state: Array.from(state.secondaryPaneState.entries()).map(
       ([bufferId, v]) => ({ buffer_id: bufferId, cursor: v.cursor, scroll_top: v.scrollTop }),
     ),
+    word_wrap: useEditorPrefs.getState().wordWrap,
+    indent_guides: useEditorPrefs.getState().indentGuides,
   });
 }
 
@@ -111,6 +114,9 @@ export default function App() {
     const stopWorkspaceWatcher = useWorkspace.subscribe(() => {
       persistSession();
     });
+    const stopEditorPrefsWatcher = useEditorPrefs.subscribe(() => {
+      persistSession();
+    });
     const stopRecentWatcher = useWorkspace.subscribe((state, prev) => {
       if (state.recentFolders !== prev.recentFolders) {
         registerRecentFolderCommands(state.recentFolders);
@@ -143,6 +149,7 @@ export default function App() {
       stopWorkspaceWatcher();
       stopRecentWatcher();
       stopWatcherSync();
+      stopEditorPrefsWatcher();
       stopFsWatcher().catch(() => {});
       unlistenFocusP.then((un) => un()).catch(() => {});
     };
