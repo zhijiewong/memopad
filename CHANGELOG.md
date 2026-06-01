@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-01
+
+Editor view polish: soft word wrap and indentation guides, both global and
+remembered across relaunch.
+
+### Added
+
+- **Word wrap** — soft-wrap long lines to the viewport. Toggle via `Alt+Z`, the
+  command palette ("View: Toggle Word Wrap"), or the **Wrap** status-bar segment.
+  Off by default.
+- **Indent guides** — faint vertical lines at each indentation level. Toggle via the
+  command palette ("View: Toggle Indent Guides"). On by default.
+- Both preferences are global (apply to all panes) and persist in `session.json`.
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- No per-file or per-language wrap/guide overrides
+- Split view is two panes max, horizontal only
+
 ## [0.4.0] — 2026-06-01
 
 The file tree becomes editable: create, rename, and delete files and folders without
