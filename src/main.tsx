@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import { useBuffers, selectActive } from './stores/buffers';
 import { useEditorPrefs } from './stores/editorPrefs';
+import { useCursorPos } from './stores/cursorPos';
 
 const w = window as unknown as {
   __memopadTestSetContent?: (s: string) => void;
@@ -37,6 +38,7 @@ const w = window as unknown as {
   };
   __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean };
   __memopadTestResetEditorPrefs?: () => void;
+  __memopadTestCursorPos?: () => { line: number; col: number };
 };
 
 w.__memopadTestSetContent = (s) => useBuffers.getState().setActiveContent(s);
@@ -66,6 +68,10 @@ w.__memopadTestEditorPrefs = () => ({
   indentGuides: useEditorPrefs.getState().indentGuides,
 });
 w.__memopadTestResetEditorPrefs = () => useEditorPrefs.getState().reset();
+w.__memopadTestCursorPos = () => ({
+  line: useCursorPos.getState().line,
+  col: useCursorPos.getState().col,
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
