@@ -56,3 +56,54 @@ describe('buffers.handleDeletedPath', () => {
     expect(useBuffers.getState().buffers.find((x) => x.id === id)).toBeUndefined();
   });
 });
+
+import { invoke } from '@tauri-apps/api/core';
+import { useWorkspace } from '../stores/workspace';
+
+const mockInvoke = invoke as unknown as ReturnType<typeof vi.fn>;
+
+describe('useWorkspace CRUD', () => {
+  beforeEach(() => {
+    useWorkspace.setState({
+      workspaceFolder: 'C:/proj',
+      expanded: new Set<string>(),
+      childrenByPath: new Map(),
+      loadingByPath: new Set<string>(),
+    } as never);
+    useBuffers.getState().resetAll();
+    vi.clearAllMocks();
+  });
+
+  it('createEntry invokes create_file and refreshes the parent', async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ name: 'new.txt', path: 'C:/proj/new.txt', is_dir: false }) // create_file
+      .mockResolvedValueOnce([{ name: 'new.txt', path: 'C:/proj/new.txt', is_dir: false }]); // list_dir
+    await useWorkspace.getState().createEntry('C:/proj', 'new.txt', false);
+    expect(mockInvoke).toHaveBeenNthCalledWith(1, 'create_file', {
+      workspaceFolder: 'C:/proj', parent: 'C:/proj', name: 'new.txt',
+    });
+    expect(useWorkspace.getState().childrenByPath.get('C:/proj')?.[0]?.name).toBe('new.txt');
+  });
+
+  it('renameEntry invokes rename_path and syncs buffers', async () => {
+    useBuffers.getState().openBuffer({ path: 'C:/proj/old.txt', content: 'x', encoding: 'utf-8', eol: 'lf' });
+    mockInvoke
+      .mockResolvedValueOnce('C:/proj/new.txt') // rename_path
+      .mockResolvedValueOnce([]); // list_dir refresh
+    const newPath = await useWorkspace.getState().renameEntry('C:/proj/old.txt', 'new.txt');
+    expect(newPath).toBe('C:/proj/new.txt');
+    expect(useBuffers.getState().buffers[0].path).toBe('C:/proj/new.txt');
+  });
+
+  it('deleteEntry invokes delete_path and closes clean buffer', async () => {
+    const id = useBuffers.getState().openBuffer({ path: 'C:/proj/gone.txt', content: 'x', encoding: 'utf-8', eol: 'lf' });
+    mockInvoke
+      .mockResolvedValueOnce(undefined) // delete_path
+      .mockResolvedValueOnce([]); // list_dir refresh
+    await useWorkspace.getState().deleteEntry('C:/proj/gone.txt');
+    expect(mockInvoke).toHaveBeenNthCalledWith(1, 'delete_path', {
+      workspaceFolder: 'C:/proj', path: 'C:/proj/gone.txt',
+    });
+    expect(useBuffers.getState().buffers.find((b) => b.id === id)).toBeUndefined();
+  });
+});
