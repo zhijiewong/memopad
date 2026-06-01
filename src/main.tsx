@@ -36,6 +36,7 @@ const w = window as unknown as {
     focusedPane: 'primary' | 'secondary';
   };
   __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean };
+  __memopadTestResetEditorPrefs?: () => void;
 };
 
 w.__memopadTestSetContent = (s) => useBuffers.getState().setActiveContent(s);
@@ -64,6 +65,7 @@ w.__memopadTestEditorPrefs = () => ({
   wordWrap: useEditorPrefs.getState().wordWrap,
   indentGuides: useEditorPrefs.getState().indentGuides,
 });
+w.__memopadTestResetEditorPrefs = () => useEditorPrefs.getState().reset();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

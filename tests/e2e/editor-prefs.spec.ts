@@ -8,10 +8,14 @@ describe('editor prefs', () => {
     await getBrowser().execute(() => {
       const w = window as unknown as {
         __memopadTestReset?: () => void;
+        __memopadTestResetEditorPrefs?: () => void;
         __memopadTestNewBuffer?: () => string;
         __memopadTestSetContent?: (s: string) => void;
       };
       w.__memopadTestReset?.();
+      // Prefs persist in session.json and restore on boot, so a prior toggle
+      // would leak across runs — reset to defaults (wrap off, guides on).
+      w.__memopadTestResetEditorPrefs?.();
       w.__memopadTestNewBuffer?.();
       // A long line so wrap has a visible effect, plus indentation.
       w.__memopadTestSetContent?.('    indented line\n' + 'x'.repeat(400));
