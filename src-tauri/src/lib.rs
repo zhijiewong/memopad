@@ -121,6 +121,44 @@ fn list_dir(workspace_folder: String, path: String)
 }
 
 #[tauri::command]
+fn create_file(workspace_folder: String, parent: String, name: String)
+    -> Result<files::DirEntry, String> {
+    files::create_file(
+        std::path::Path::new(&workspace_folder),
+        std::path::Path::new(&parent),
+        &name,
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_dir(workspace_folder: String, parent: String, name: String)
+    -> Result<files::DirEntry, String> {
+    files::create_dir(
+        std::path::Path::new(&workspace_folder),
+        std::path::Path::new(&parent),
+        &name,
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn rename_path(workspace_folder: String, path: String, new_name: String)
+    -> Result<String, String> {
+    files::rename_entry(
+        std::path::Path::new(&workspace_folder),
+        std::path::Path::new(&path),
+        &new_name,
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_path(workspace_folder: String, path: String) -> Result<(), String> {
+    files::delete_entry(
+        std::path::Path::new(&workspace_folder),
+        std::path::Path::new(&path),
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn walk_files(workspace_folder: String) -> Result<files::WalkResponse, String> {
     files::walk_files(std::path::Path::new(&workspace_folder)).map_err(|e| e.to_string())
 }
@@ -179,6 +217,10 @@ pub fn run() {
             stat_file,
             find_in_folder,
             list_dir,
+            create_file,
+            create_dir,
+            rename_path,
+            delete_path,
             walk_files,
             replace_in_files,
             watch_start,
