@@ -4,7 +4,7 @@ import { useBuffers } from '../stores/buffers';
 import { openFile as openFileIpc, type DirEntry, revealInExplorer } from '../lib/tauri';
 import { TabContextMenu, type TabContextMenuItem } from './TabContextMenu';
 import { InlineEditRow } from './InlineEditRow';
-import { relativeToWorkspace } from '../lib/path';
+import { relativeToWorkspace, isInvalidMove } from '../lib/path';
 
 interface Props {
   entry: DirEntry;
@@ -19,8 +19,11 @@ export function TreeNode({ entry, depth }: Props) {
   const editState = useWorkspace((s) => s.editState);
   const setEditState = useWorkspace((s) => s.setEditState);
   const setPendingDelete = useWorkspace((s) => s.setPendingDelete);
+  const dragPath = useWorkspace((s) => s.dragPath);
+  const setDragPath = useWorkspace((s) => s.setDragPath);
 
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [isDropTarget, setIsDropTarget] = useState(false);
 
   const isOpen = expanded.has(entry.path);
   const kids = childrenByPath.get(entry.path);
@@ -104,8 +107,29 @@ export function TreeNode({ entry, depth }: Props) {
             if (e.key === 'F2') { e.preventDefault(); setEditState({ mode: 'rename', path: entry.path }); }
             else if (e.key === 'Delete') { e.preventDefault(); setPendingDelete(entry); }
           }}
+          draggable
+          onDragStart={(e) => { e.stopPropagation(); setDragPath(entry.path); }}
+          onDragEnd={() => setDragPath(null)}
+          onDragOver={entry.is_dir ? (e) => {
+            if (dragPath && !isInvalidMove(dragPath, entry.path)) {
+              e.preventDefault();
+              setIsDropTarget(true);
+            }
+          } : undefined}
+          onDragLeave={entry.is_dir ? () => setIsDropTarget(false) : undefined}
+          onDrop={entry.is_dir ? (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDropTarget(false);
+            const src = dragPath;
+            setDragPath(null);
+            if (src && !isInvalidMove(src, entry.path)) {
+              useWorkspace.getState().moveEntry(src, entry.path)
+                .catch((err) => useWorkspace.getState().setMoveError(String(err?.message ?? err)));
+            }
+          } : undefined}
           title={entry.path}
-          className="block w-full cursor-pointer truncate text-left text-xs text-neutral-300 hover:bg-neutral-800"
+          className={`block w-full cursor-pointer truncate text-left text-xs text-neutral-300 hover:bg-neutral-800 ${isDropTarget ? 'bg-blue-900/40 ring-1 ring-inset ring-blue-500' : ''}`}
           style={{ paddingLeft: `${depth * 12 + 6}px`, paddingTop: 2, paddingBottom: 2 }}
         >
           <span className="mr-1 inline-block w-3 text-neutral-500">
