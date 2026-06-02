@@ -194,6 +194,29 @@ pub fn delete_entry(workspace: &Path, path: &Path) -> Result<(), FilesError> {
     trash::delete(&path_canon).map_err(|e| FilesError::Trash(e.to_string()))
 }
 
+/// Move `src` into directory `dest_dir` (both under `workspace`). Returns the new path.
+pub fn move_entry(workspace: &Path, src: &Path, dest_dir: &Path) -> Result<String, FilesError> {
+    let src_canon = resolve_under(workspace, src)?;
+    let dest_canon = resolve_under(workspace, dest_dir)?;
+    if !dest_canon.is_dir() {
+        return Err(FilesError::NotADirectory);
+    }
+    // Reject moving a directory into itself or one of its own descendants.
+    if dest_canon == src_canon || dest_canon.starts_with(&src_canon) {
+        return Err(FilesError::InvalidName);
+    }
+    let name = src_canon.file_name().ok_or(FilesError::PathMissing)?;
+    let target = dest_canon.join(name);
+    if target.exists() {
+        if target == src_canon {
+            return Ok(src_canon.to_string_lossy().to_string()); // same-parent no-op
+        }
+        return Err(FilesError::AlreadyExists);
+    }
+    std::fs::rename(&src_canon, &target)?;
+    Ok(target.to_string_lossy().to_string())
+}
+
 pub const MAX_QUICK_OPEN_FILES: usize = 10_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -526,6 +549,61 @@ mod tests {
     fn delete_entry_rejects_missing_path() {
         let ws = tmp("del_missing");
         let err = delete_entry(&ws, &ws.join("nope.txt")).unwrap_err();
+        matches!(err, FilesError::PathMissing).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn move_entry_moves_file_into_subdir() {
+        let ws = tmp("mv");
+        touch(&ws, "a.txt");
+        std::fs::create_dir_all(ws.join("sub")).unwrap();
+        let new_path = move_entry(&ws, &ws.join("a.txt"), &ws.join("sub")).unwrap();
+        assert!(new_path.replace('\\', "/").ends_with("sub/a.txt"));
+        assert!(!ws.join("a.txt").exists());
+        assert!(ws.join("sub/a.txt").is_file());
+    }
+
+    #[test]
+    fn move_entry_rejects_into_self() {
+        let ws = tmp("mv_self");
+        std::fs::create_dir_all(ws.join("d")).unwrap();
+        let err = move_entry(&ws, &ws.join("d"), &ws.join("d")).unwrap_err();
+        matches!(err, FilesError::InvalidName).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn move_entry_rejects_into_descendant() {
+        let ws = tmp("mv_desc");
+        std::fs::create_dir_all(ws.join("d/child")).unwrap();
+        let err = move_entry(&ws, &ws.join("d"), &ws.join("d/child")).unwrap_err();
+        matches!(err, FilesError::InvalidName).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn move_entry_rejects_collision() {
+        let ws = tmp("mv_col");
+        touch(&ws, "a.txt");
+        std::fs::create_dir_all(ws.join("sub")).unwrap();
+        touch(&ws, "sub/a.txt");
+        let err = move_entry(&ws, &ws.join("a.txt"), &ws.join("sub")).unwrap_err();
+        matches!(err, FilesError::AlreadyExists).then_some(()).unwrap();
+    }
+
+    #[test]
+    fn move_entry_same_parent_is_noop() {
+        let ws = tmp("mv_noop");
+        touch(&ws, "a.txt");
+        let p = move_entry(&ws, &ws.join("a.txt"), &ws).unwrap();
+        assert!(p.replace('\\', "/").ends_with("a.txt"));
+        assert!(ws.join("a.txt").is_file());
+    }
+
+    #[test]
+    fn move_entry_rejects_dest_outside_workspace() {
+        let ws = tmp("mv_ws");
+        let other = tmp("mv_out");
+        touch(&ws, "a.txt");
+        let err = move_entry(&ws, &ws.join("a.txt"), &other).unwrap_err();
         matches!(err, FilesError::PathMissing).then_some(()).unwrap();
     }
 
