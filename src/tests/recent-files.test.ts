@@ -44,3 +44,11 @@ describe('openBuffer pushes recent files', () => {
     expect(useRecentFiles.getState().recentFiles).toEqual(['C:/proj/b.txt', 'C:/proj/a.txt']);
   });
 });
+
+describe('recent files session restore', () => {
+  beforeEach(() => useRecentFiles.getState().clear());
+  it('setRecent applies a restored list', () => {
+    useRecentFiles.getState().setRecent(['C:/proj/x.txt', 'C:/proj/y.txt']);
+    expect(useRecentFiles.getState().recentFiles).toEqual(['C:/proj/x.txt', 'C:/proj/y.txt']);
+  });
+});

@@ -8,10 +8,11 @@ import { GoToLineDialog } from './components/GoToLineDialog';
 import { StatusBar } from './components/StatusBar';
 import { Sidebar } from './components/Sidebar';
 import { useCommands } from './commands/registry';
-import { registerBuiltins, registerRecentFolderCommands } from './commands/builtins';
+import { registerBuiltins, registerRecentFolderCommands, registerRecentFileCommands } from './commands/builtins';
 import { useBuffers, selectFocused } from './stores/buffers';
 import { useTheme, effectiveTheme } from './stores/theme';
 import { useWorkspace } from './stores/workspace';
+import { useRecentFiles } from './stores/recentFiles';
 import { useEditorPrefs } from './stores/editorPrefs';
 import { startJournalDebounce } from './lib/journal-debounce';
 import { startFsWatcher, stopFsWatcher } from './lib/fs-watcher';
@@ -43,6 +44,7 @@ function persistSession() {
     active_id: state.activeId,
     workspace_folder: folder,
     recent_folders: recent,
+    recent_files: useRecentFiles.getState().recentFiles,
     split_active: state.splitActive,
     secondary_id: state.secondaryId,
     focused_pane: state.focusedPane,
@@ -106,6 +108,7 @@ export default function App() {
       .then(() => recordStatsForBuffersWithoutOne())
       .then(() => {
         registerRecentFolderCommands(useWorkspace.getState().recentFolders);
+        registerRecentFileCommands(useRecentFiles.getState().recentFiles);
       })
       .catch((err) => console.error('boot failed:', err));
 
@@ -123,6 +126,12 @@ export default function App() {
     const stopRecentWatcher = useWorkspace.subscribe((state, prev) => {
       if (state.recentFolders !== prev.recentFolders) {
         registerRecentFolderCommands(state.recentFolders);
+      }
+    });
+    const stopRecentFilesWatcher = useRecentFiles.subscribe((state, prev) => {
+      if (state.recentFiles !== prev.recentFiles) {
+        registerRecentFileCommands(state.recentFiles);
+        persistSession();
       }
     });
     const stopWatcherSync = useWorkspace.subscribe((state, prev) => {
@@ -151,6 +160,7 @@ export default function App() {
       stopSessionWatcher();
       stopWorkspaceWatcher();
       stopRecentWatcher();
+      stopRecentFilesWatcher();
       stopWatcherSync();
       stopEditorPrefsWatcher();
       stopFsWatcher().catch(() => {});
@@ -218,6 +228,7 @@ export default function App() {
         (window as unknown as { __memopadToggleSidebarTab?: () => void }).__memopadToggleSidebarTab?.();
         return;
       }
+      if (key === 'e' && !e.shiftKey) { e.preventDefault(); runCommand('file.openRecent'); return; }
       if (key === 'f' && e.shiftKey)  { e.preventDefault(); (window as unknown as { __memopadOpenSidebarAndFocusFind?: () => void }).__memopadOpenSidebarAndFocusFind?.(); return; }
       if (key === 'f' && !e.shiftKey) {
         e.preventDefault();

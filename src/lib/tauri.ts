@@ -64,6 +64,7 @@ export interface SessionState {
   active_id: string | null;
   workspace_folder?: string | null;
   recent_folders?: string[];
+  recent_files?: string[];
   split_active?: boolean;
   secondary_id?: string | null;
   focused_pane?: 'primary' | 'secondary';
