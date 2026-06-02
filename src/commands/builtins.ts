@@ -62,6 +62,32 @@ export function registerRecentFolderCommands(paths: string[]) {
   });
 }
 
+export function registerRecentFileCommands(paths: string[]) {
+  const { commands, register, unregister } = useCommands.getState();
+  for (const c of commands) {
+    if (c.id.startsWith('file.recent.')) unregister(c.id);
+  }
+  paths.forEach((p, i) => {
+    const basename = p.split(/[/\\]/).filter(Boolean).pop() ?? p;
+    register({
+      id: `file.recent.${i}`,
+      title: `Open Recent File: ${basename}`,
+      run: async () => {
+        const { useBuffers } = await import('../stores/buffers');
+        const { useRecentFiles } = await import('../stores/recentFiles');
+        const { openFile } = await import('../lib/tauri');
+        try {
+          const opened = await openFile(p);
+          useBuffers.getState().openBuffer(opened);
+        } catch {
+          useRecentFiles.getState().remove(p);
+          console.warn(`Recent file no longer exists: ${p}`);
+        }
+      },
+    });
+  });
+}
+
 export function registerBuiltins() {
   const { register } = useCommands.getState();
 
@@ -262,6 +288,16 @@ export function registerBuiltins() {
     run: () => {
       (window as unknown as { __memopadOpenPaletteWithQuery?: (q: string) => void })
         .__memopadOpenPaletteWithQuery?.('Open Recent: ');
+    },
+  });
+
+  register({
+    id: 'file.openRecent',
+    title: 'Open Recent File…',
+    shortcut: 'Ctrl+E',
+    run: () => {
+      (window as unknown as { __memopadOpenPaletteWithQuery?: (q: string) => void })
+        .__memopadOpenPaletteWithQuery?.('Open Recent File: ');
     },
   });
 
