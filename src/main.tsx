@@ -36,7 +36,7 @@ const w = window as unknown as {
     secondaryId: string | null;
     focusedPane: 'primary' | 'secondary';
   };
-  __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean };
+  __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean; minimap: boolean };
   __memopadTestResetEditorPrefs?: () => void;
   __memopadTestCursorPos?: () => { line: number; col: number };
 };
@@ -66,6 +66,7 @@ w.__memopadTestSplitState = () => {
 w.__memopadTestEditorPrefs = () => ({
   wordWrap: useEditorPrefs.getState().wordWrap,
   indentGuides: useEditorPrefs.getState().indentGuides,
+  minimap: useEditorPrefs.getState().minimap,
 });
 w.__memopadTestResetEditorPrefs = () => useEditorPrefs.getState().reset();
 w.__memopadTestCursorPos = () => ({

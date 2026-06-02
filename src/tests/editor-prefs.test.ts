@@ -40,6 +40,24 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
 import { applyEditorPrefsFromSession } from '../lib/boot';
 
+describe('useEditorPrefs minimap', () => {
+  beforeEach(() => useEditorPrefs.getState().reset());
+
+  it('defaults minimap off', () => {
+    expect(useEditorPrefs.getState().minimap).toBe(false);
+  });
+  it('toggleMinimap flips it', () => {
+    useEditorPrefs.getState().toggleMinimap();
+    expect(useEditorPrefs.getState().minimap).toBe(true);
+  });
+  it('setMinimap sets it; reset clears it', () => {
+    useEditorPrefs.getState().setMinimap(true);
+    expect(useEditorPrefs.getState().minimap).toBe(true);
+    useEditorPrefs.getState().reset();
+    expect(useEditorPrefs.getState().minimap).toBe(false);
+  });
+});
+
 describe('editor prefs session restore', () => {
   beforeEach(() => useEditorPrefs.getState().reset());
 
@@ -53,5 +71,10 @@ describe('editor prefs session restore', () => {
     applyEditorPrefsFromSession({});
     expect(useEditorPrefs.getState().wordWrap).toBe(false);
     expect(useEditorPrefs.getState().indentGuides).toBe(true);
+  });
+
+  it('applies minimap from session', () => {
+    applyEditorPrefsFromSession({ minimap: true });
+    expect(useEditorPrefs.getState().minimap).toBe(true);
   });
 });

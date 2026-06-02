@@ -161,6 +161,11 @@ export function registerBuiltins() {
     title: 'View: Toggle Indent Guides',
     run: () => useEditorPrefs.getState().toggleIndentGuides(),
   });
+  register({
+    id: 'view.toggleMinimap',
+    title: 'View: Toggle Minimap',
+    run: () => useEditorPrefs.getState().toggleMinimap(),
+  });
 
   register({
     id: 'edit.find',

@@ -52,6 +52,8 @@ pub struct SessionState {
     pub word_wrap: Option<bool>,
     #[serde(default)]
     pub indent_guides: Option<bool>,
+    #[serde(default)]
+    pub minimap: Option<bool>,
 }
 
 impl Default for SessionState {
@@ -67,6 +69,7 @@ impl Default for SessionState {
             secondary_pane_state: Vec::new(),
             word_wrap: None,
             indent_guides: None,
+            minimap: None,
         }
     }
 }
@@ -133,6 +136,7 @@ mod tests {
             secondary_pane_state: Vec::new(),
             word_wrap: None,
             indent_guides: None,
+            minimap: None,
         };
         save_at(&dir, &state).unwrap();
         let loaded = load_at(&dir);
@@ -168,6 +172,7 @@ mod tests {
             secondary_pane_state: Vec::new(),
             word_wrap: None,
             indent_guides: None,
+            minimap: None,
         }).unwrap();
         save_at(&dir, &SessionState::default()).unwrap();
         assert_eq!(load_at(&dir), SessionState::default());
@@ -197,6 +202,7 @@ mod tests {
             secondary_pane_state: Vec::new(),
             word_wrap: None,
             indent_guides: None,
+            minimap: None,
         };
         save_at(&dir, &state).unwrap();
         assert_eq!(load_at(&dir).workspace_folder, Some("C:\\proj".into()));
@@ -227,6 +233,7 @@ mod tests {
             secondary_pane_state: Vec::new(),
             word_wrap: None,
             indent_guides: None,
+            minimap: None,
         };
         save_at(&dir, &state).unwrap();
         assert_eq!(load_at(&dir).recent_folders, vec!["C:\\a".to_string(), "C:\\b".to_string()]);
@@ -255,6 +262,7 @@ mod tests {
             }],
             word_wrap: None,
             indent_guides: None,
+            minimap: None,
         };
         save_at(&dir, &state).unwrap();
         assert_eq!(load_at(&dir), state);
@@ -293,6 +301,22 @@ mod tests {
         let back: SessionState = serde_json::from_str(&json).unwrap();
         assert_eq!(back.word_wrap, Some(true));
         assert_eq!(back.indent_guides, Some(false));
+    }
+
+    #[test]
+    fn session_state_defaults_minimap_when_absent() {
+        let json = r#"{ "tabs": [], "active_id": null }"#;
+        let s: SessionState = serde_json::from_str(json).unwrap();
+        assert_eq!(s.minimap, None);
+    }
+
+    #[test]
+    fn session_state_roundtrips_minimap() {
+        let mut s = SessionState::default();
+        s.minimap = Some(true);
+        let json = serde_json::to_string(&s).unwrap();
+        let back: SessionState = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.minimap, Some(true));
     }
 
     #[test]
