@@ -41,6 +41,8 @@ pub struct SessionState {
     #[serde(default)]
     pub recent_folders: Vec<String>,
     #[serde(default)]
+    pub recent_files: Vec<String>,
+    #[serde(default)]
     pub split_active: bool,
     #[serde(default)]
     pub secondary_id: Option<String>,
@@ -63,6 +65,7 @@ impl Default for SessionState {
             active_id: None,
             workspace_folder: None,
             recent_folders: Vec::new(),
+            recent_files: Vec::new(),
             split_active: false,
             secondary_id: None,
             focused_pane: PaneSide::Primary,
@@ -130,6 +133,7 @@ mod tests {
             active_id: Some("b1".into()),
             workspace_folder: None,
             recent_folders: Vec::new(),
+            recent_files: Vec::new(),
             split_active: false,
             secondary_id: None,
             focused_pane: PaneSide::Primary,
@@ -166,6 +170,7 @@ mod tests {
             active_id: None,
             workspace_folder: None,
             recent_folders: Vec::new(),
+            recent_files: Vec::new(),
             split_active: false,
             secondary_id: None,
             focused_pane: PaneSide::Primary,
@@ -196,6 +201,7 @@ mod tests {
             active_id: None,
             workspace_folder: Some("C:\\proj".into()),
             recent_folders: Vec::new(),
+            recent_files: Vec::new(),
             split_active: false,
             secondary_id: None,
             focused_pane: PaneSide::Primary,
@@ -227,6 +233,7 @@ mod tests {
             active_id: None,
             workspace_folder: None,
             recent_folders: vec!["C:\\a".into(), "C:\\b".into()],
+            recent_files: Vec::new(),
             split_active: false,
             secondary_id: None,
             focused_pane: PaneSide::Primary,
@@ -252,6 +259,7 @@ mod tests {
             active_id: Some("b1".into()),
             workspace_folder: None,
             recent_folders: Vec::new(),
+            recent_files: Vec::new(),
             split_active: true,
             secondary_id: Some("b1".into()),
             focused_pane: PaneSide::Secondary,
@@ -317,6 +325,22 @@ mod tests {
         let json = serde_json::to_string(&s).unwrap();
         let back: SessionState = serde_json::from_str(&json).unwrap();
         assert_eq!(back.minimap, Some(true));
+    }
+
+    #[test]
+    fn session_state_defaults_recent_files_when_absent() {
+        let json = r#"{ "tabs": [], "active_id": null }"#;
+        let s: SessionState = serde_json::from_str(json).unwrap();
+        assert!(s.recent_files.is_empty());
+    }
+
+    #[test]
+    fn session_state_roundtrips_recent_files() {
+        let mut s = SessionState::default();
+        s.recent_files = vec!["C:/proj/a.txt".to_string(), "C:/proj/b.txt".to_string()];
+        let json = serde_json::to_string(&s).unwrap();
+        let back: SessionState = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.recent_files, vec!["C:/proj/a.txt".to_string(), "C:/proj/b.txt".to_string()]);
     }
 
     #[test]
