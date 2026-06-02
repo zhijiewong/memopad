@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-06-02
+
+### Added
+
+- **Code minimap** — a scrollable overview of the file on the editor's right edge. Toggle via
+  the command palette ("View: Toggle Minimap"). Global and remembered across relaunch; off by
+  default.
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- Minimap rendering is fixed (block style, always-on overlay); not configurable
+- Split view is two panes max, horizontal only
+
 ## [0.8.0] — 2026-06-02
 
 The file tree learns to move things.
