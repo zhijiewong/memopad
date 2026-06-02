@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useRecentFiles } from '../stores/recentFiles';
+import { useBuffers } from '../stores/buffers';
 
 describe('useRecentFiles', () => {
   beforeEach(() => useRecentFiles.getState().clear());
@@ -31,5 +32,15 @@ describe('useRecentFiles', () => {
   it('setRecent replaces and caps', () => {
     useRecentFiles.getState().setRecent(Array.from({ length: 20 }, (_, i) => `f${i}`));
     expect(useRecentFiles.getState().recentFiles.length).toBe(15);
+  });
+});
+
+describe('openBuffer pushes recent files', () => {
+  beforeEach(() => { useRecentFiles.getState().clear(); useBuffers.getState().resetAll(); });
+
+  it('records opened paths MRU', () => {
+    useBuffers.getState().openBuffer({ path: 'C:/proj/a.txt', content: '', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().openBuffer({ path: 'C:/proj/b.txt', content: '', encoding: 'utf-8', eol: 'lf' });
+    expect(useRecentFiles.getState().recentFiles).toEqual(['C:/proj/b.txt', 'C:/proj/a.txt']);
   });
 });
