@@ -3,6 +3,7 @@ import { useWorkspace } from '../stores/workspace';
 import { TreeNode } from './TreeNode';
 import { InlineEditRow } from './InlineEditRow';
 import { ConfirmDialog } from './ConfirmDialog';
+import { isInvalidMove } from '../lib/path';
 
 export function FileTreePanel() {
   const folder = useWorkspace((s) => s.workspaceFolder);
@@ -15,6 +16,8 @@ export function FileTreePanel() {
   const setEditState = useWorkspace((s) => s.setEditState);
   const pendingDelete = useWorkspace((s) => s.pendingDelete);
   const setPendingDelete = useWorkspace((s) => s.setPendingDelete);
+  const dragPath = useWorkspace((s) => s.dragPath);
+  const moveError = useWorkspace((s) => s.moveError);
 
   useEffect(() => {
     if (!folder) return;
@@ -23,22 +26,31 @@ export function FileTreePanel() {
     toggleExpand(folder).catch(() => {});
   }, [folder, childrenByPath, loadingByPath, toggleExpand]);
 
+  useEffect(() => {
+    if (!moveError) return;
+    const t = setTimeout(() => useWorkspace.getState().setMoveError(null), 4000);
+    return () => clearTimeout(t);
+  }, [moveError]);
+
   // e2e test hooks — drive CRUD without simulating the native context menu.
   useEffect(() => {
     const w = window as unknown as {
       __memopadTreeCreate?: (parent: string, name: string, isDir: boolean) => Promise<unknown>;
       __memopadTreeRename?: (path: string, newName: string) => Promise<unknown>;
       __memopadTreeDelete?: (path: string) => Promise<unknown>;
+      __memopadTreeMove?: (src: string, destDir: string) => Promise<unknown>;
     };
     w.__memopadTreeCreate = (parent, name, isDir) =>
       useWorkspace.getState().createEntry(parent, name, isDir);
     w.__memopadTreeRename = (path, newName) =>
       useWorkspace.getState().renameEntry(path, newName);
     w.__memopadTreeDelete = (path) => useWorkspace.getState().deleteEntry(path);
+    w.__memopadTreeMove = (src, destDir) => useWorkspace.getState().moveEntry(src, destDir);
     return () => {
       delete w.__memopadTreeCreate;
       delete w.__memopadTreeRename;
       delete w.__memopadTreeDelete;
+      delete w.__memopadTreeMove;
     };
   }, []);
 
@@ -81,7 +93,32 @@ export function FileTreePanel() {
           >×</button>
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-auto py-1">
+      {moveError && (
+        <div data-testid="tree-move-error" className="border-b border-red-700 bg-red-900/40 px-3 py-1 text-xs text-red-200">
+          {moveError}
+          <button
+            type="button"
+            onClick={() => useWorkspace.getState().setMoveError(null)}
+            className="ml-2 text-red-300 hover:text-red-100"
+          >×</button>
+        </div>
+      )}
+      <div
+        className="min-h-0 flex-1 overflow-auto py-1"
+        onDragOver={(e) => {
+          if (dragPath && !isInvalidMove(dragPath, folder)) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          if (e.target !== e.currentTarget) return; // a folder row handled it
+          e.preventDefault();
+          const src = dragPath;
+          useWorkspace.getState().setDragPath(null);
+          if (src && !isInvalidMove(src, folder)) {
+            useWorkspace.getState().moveEntry(src, folder)
+              .catch((err) => useWorkspace.getState().setMoveError(String(err?.message ?? err)));
+          }
+        }}
+      >
         {isRootCreate && editState?.mode === 'create' && (
           <InlineEditRow
             depth={0}
