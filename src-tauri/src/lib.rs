@@ -151,6 +151,16 @@ fn rename_path(workspace_folder: String, path: String, new_name: String)
 }
 
 #[tauri::command]
+fn move_path(workspace_folder: String, src: String, dest_dir: String)
+    -> Result<String, String> {
+    files::move_entry(
+        std::path::Path::new(&workspace_folder),
+        std::path::Path::new(&src),
+        std::path::Path::new(&dest_dir),
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn delete_path(workspace_folder: String, path: String) -> Result<(), String> {
     files::delete_entry(
         std::path::Path::new(&workspace_folder),
@@ -220,6 +230,7 @@ pub fn run() {
             create_file,
             create_dir,
             rename_path,
+            move_path,
             delete_path,
             walk_files,
             replace_in_files,

@@ -189,6 +189,12 @@ export async function renamePath(
   return invoke<string>('rename_path', { workspaceFolder, path, newName });
 }
 
+export async function movePath(
+  workspaceFolder: string, src: string, destDir: string,
+): Promise<string> {
+  return invoke<string>('move_path', { workspaceFolder, src, destDir });
+}
+
 export async function deletePath(workspaceFolder: string, path: string): Promise<void> {
   return invoke<void>('delete_path', { workspaceFolder, path });
 }
