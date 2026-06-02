@@ -72,4 +72,9 @@ describe('editor prefs session restore', () => {
     expect(useEditorPrefs.getState().wordWrap).toBe(false);
     expect(useEditorPrefs.getState().indentGuides).toBe(true);
   });
+
+  it('applies minimap from session', () => {
+    applyEditorPrefsFromSession({ minimap: true });
+    expect(useEditorPrefs.getState().minimap).toBe(true);
+  });
 });

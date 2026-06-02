@@ -70,6 +70,7 @@ export interface SessionState {
   secondary_pane_state?: PaneCursor[];
   word_wrap?: boolean | null;
   indent_guides?: boolean | null;
+  minimap?: boolean | null;
 }
 
 export interface FileStat {

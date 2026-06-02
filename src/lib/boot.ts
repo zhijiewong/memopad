@@ -14,10 +14,11 @@ function asEol(s: string): LineEnding {
 
 /** Apply persisted editor prefs from a loaded session; null/absent keeps store defaults. */
 export function applyEditorPrefsFromSession(
-  session: { word_wrap?: boolean | null; indent_guides?: boolean | null },
+  session: { word_wrap?: boolean | null; indent_guides?: boolean | null; minimap?: boolean | null },
 ): void {
   if (session.word_wrap != null) useEditorPrefs.getState().setWordWrap(session.word_wrap);
   if (session.indent_guides != null) useEditorPrefs.getState().setIndentGuides(session.indent_guides);
+  if (session.minimap != null) useEditorPrefs.getState().setMinimap(session.minimap);
 }
 
 /**

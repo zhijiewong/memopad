@@ -51,6 +51,7 @@ function persistSession() {
     ),
     word_wrap: useEditorPrefs.getState().wordWrap,
     indent_guides: useEditorPrefs.getState().indentGuides,
+    minimap: useEditorPrefs.getState().minimap,
   });
 }
 
