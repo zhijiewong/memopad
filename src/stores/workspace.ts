@@ -109,6 +109,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       expanded: new Set<string>(),
       childrenByPath: new Map<string, DirEntry[]>(),
       loadingByPath: new Set<string>(),
+      dragPath: null,
+      moveError: null,
     });
   },
 
