@@ -50,7 +50,8 @@ describe('tree move', () => {
          ? window.__memopadTestGetActiveBufferPath() : null;`,
     ).catch(() => null);
     if (bufPath) {
-      expect(bufPath.replace(/\\\\/g, '/').toLowerCase()).to.contain('sub/mv-tmp.txt');
+      // Normalize separators (the moved path is canonicalized, e.g. \\?\E:\...\sub\mv-tmp.txt).
+      expect(bufPath.replace(/\\/g, '/').toLowerCase()).to.contain('sub/mv-tmp.txt');
     }
 
     // Cleanup.
