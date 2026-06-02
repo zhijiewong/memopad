@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-06-02
+
+The file tree learns to move things.
+
+### Added
+
+- **Drag-to-move** — drag a file or folder onto another folder, or onto the tree root,
+  to move it. Open editors follow the move; moving a folder into itself/a descendant or
+  onto a name that already exists is blocked (with a brief banner for collisions).
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- Drag-to-move targets folders and the root only (not files); no multi-select, copy-on-drag,
+  or OS drag in/out
+- Split view is two panes max, horizontal only
+
 ## [0.7.0] — 2026-06-01
 
 Line editing shortcuts surfaced and rounded out.
