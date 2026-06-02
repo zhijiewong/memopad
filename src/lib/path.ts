@@ -17,3 +17,15 @@ export function relativeToWorkspace(path: string, workspace: string): string {
   }
   return path;
 }
+
+/** True when moving `src` into `destDir` is a no-op or illegal (same parent, into self, into a descendant). */
+export function isInvalidMove(src: string, destDir: string): boolean {
+  const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const s = norm(src);
+  const d = norm(destDir);
+  if (d === s) return true;                  // into itself
+  if (d.startsWith(s + '/')) return true;    // into a descendant
+  const parent = s.slice(0, s.lastIndexOf('/'));
+  if (d === parent) return true;             // already in destDir
+  return false;
+}
