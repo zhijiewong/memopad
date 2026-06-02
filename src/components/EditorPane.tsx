@@ -14,6 +14,7 @@ import {
 import { Prec } from '@codemirror/state';
 import { moveLineUp, moveLineDown, copyLineDown, deleteLine } from '@codemirror/commands';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+import { showMinimap } from '@replit/codemirror-minimap';
 import { useEditorPrefs } from '../stores/editorPrefs';
 import { useBuffers, selectPaneState } from '../stores/buffers';
 import { languageForPath } from '../lib/language';
@@ -79,6 +80,7 @@ export function EditorPane(props: EditorPaneProps) {
   const themeExt = effectiveTheme(themeMode) === 'dark' ? memopadDark : memopadLight;
   const wordWrap = useEditorPrefs((s) => s.wordWrap);
   const indentGuides = useEditorPrefs((s) => s.indentGuides);
+  const minimap = useEditorPrefs((s) => s.minimap);
 
   const viewRef = useRef<EditorView | null>(null);
 
@@ -304,6 +306,11 @@ export function EditorPane(props: EditorPaneProps) {
             Prec.high(keymap.of([{ key: 'Mod-d', run: copyLineDown, preventDefault: true }])),
             ...(wordWrap ? [EditorView.lineWrapping] : []),
             ...(indentGuides ? [indentationMarkers()] : []),
+            ...(minimap ? [showMinimap.compute([], () => ({
+              create: () => ({ dom: document.createElement('div') }),
+              displayText: 'blocks' as const,
+              showOverlay: 'always' as const,
+            }))] : []),
             ...languageForPath(buffer.path),
           ]}
           onChange={setActiveContent}
