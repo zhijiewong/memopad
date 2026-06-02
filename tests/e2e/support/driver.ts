@@ -29,6 +29,14 @@ let tauriDriver: ChildProcess | undefined;
 let edgedriverProc: ChildProcess | undefined;
 let sessionId: string | undefined;
 
+// Reuse a single persistent connection for all raw WebDriver HTTP calls. Without
+// keep-alive, every classicExecute/wdRequest opened a fresh TCP socket to
+// 127.0.0.1:4444; across the full suite's hundreds of calls those sockets pile up
+// in TIME_WAIT and the OS eventually can't allocate an ephemeral port — surfacing
+// as intermittent EADDRINUSE late in the run. maxSockets:1 forces one reused socket
+// (our calls are sequential).
+const keepAliveAgent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
 declare global {
   // eslint-disable-next-line no-var
   var __memopadBrowser: Browser | undefined;
@@ -64,6 +72,7 @@ export async function classicExecute<T = unknown>(script: string, args: unknown[
         path: `/session/${sessionId}/execute/sync`,
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        agent: keepAliveAgent,
       },
       (res) => {
         let data = '';
@@ -97,6 +106,7 @@ function wdRequest<T = unknown>(method: string, path: string, body?: unknown): P
         headers: data
           ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
           : {},
+        agent: keepAliveAgent,
       },
       (res) => {
         let d = '';
