@@ -39,6 +39,7 @@ export interface JournalSnapshot {
   content: string;
   encoding: Encoding;
   eol: LineEnding;
+  window_label: string;
 }
 
 export interface RestoredEntry {
@@ -59,19 +60,28 @@ export interface PaneCursor {
   scroll_top?: number | null;
 }
 
-export interface SessionState {
+export interface EditorPrefsWire {
+  word_wrap?: boolean | null;
+  indent_guides?: boolean | null;
+  minimap?: boolean | null;
+}
+
+export interface WindowSession {
+  label: string;
   tabs: TabEntry[];
   active_id: string | null;
   workspace_folder?: string | null;
-  recent_folders?: string[];
-  recent_files?: string[];
   split_active?: boolean;
   secondary_id?: string | null;
   focused_pane?: 'primary' | 'secondary';
   secondary_pane_state?: PaneCursor[];
-  word_wrap?: boolean | null;
-  indent_guides?: boolean | null;
-  minimap?: boolean | null;
+}
+
+export interface AppSession {
+  windows: WindowSession[];
+  editor_prefs: EditorPrefsWire;
+  recent_folders: string[];
+  recent_files: string[];
 }
 
 export interface FileStat {
@@ -90,9 +100,9 @@ export async function journalSnapshot(
   }
 }
 
-export async function journalReplay(): Promise<RestoredEntry[]> {
+export async function journalReplay(windowLabel: string): Promise<RestoredEntry[]> {
   try {
-    return await invoke<RestoredEntry[]>('journal_replay');
+    return await invoke<RestoredEntry[]>('journal_replay', { windowLabel });
   } catch (e) {
     throw asError(e);
   }
@@ -106,17 +116,77 @@ export async function journalClear(bufferId: string): Promise<void> {
   }
 }
 
-export async function sessionSave(state: SessionState): Promise<void> {
+export async function sessionLoad(): Promise<AppSession> {
   try {
-    await invoke<void>('session_save', { state });
+    return await invoke<AppSession>('session_load');
   } catch (e) {
     throw asError(e);
   }
 }
 
-export async function sessionLoad(): Promise<SessionState> {
+export async function sessionClaimWindow(): Promise<WindowSession | null> {
   try {
-    return await invoke<SessionState>('session_load');
+    return await invoke<WindowSession | null>('session_claim_window');
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function sessionPendingCount(): Promise<number> {
+  try {
+    return await invoke<number>('session_pending_count');
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function sessionSaveWindow(label: string, window: WindowSession): Promise<void> {
+  try {
+    await invoke<void>('session_save_window', { label, window });
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function sessionSaveApp(
+  editorPrefs: EditorPrefsWire,
+  recentFolders: string[],
+  recentFiles: string[],
+): Promise<void> {
+  try {
+    await invoke<void>('session_save_app', { editorPrefs, recentFolders, recentFiles });
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function sessionForgetWindow(label: string): Promise<void> {
+  try {
+    await invoke<void>('session_forget_window', { label });
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function windowCount(): Promise<number> {
+  try {
+    return await invoke<number>('window_count');
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function quitApp(): Promise<void> {
+  try {
+    await invoke<void>('quit_app');
+  } catch (e) {
+    throw asError(e);
+  }
+}
+
+export async function newWindow(): Promise<string> {
+  try {
+    return await invoke<string>('new_window');
   } catch (e) {
     throw asError(e);
   }
