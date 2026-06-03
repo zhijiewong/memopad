@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 /// Maximum snapshots retained per buffer journal file.
 pub const RETAIN_SNAPSHOTS: usize = 10;
 
+fn default_window_label() -> String {
+    "main".to_string()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Snapshot {
     /// File path on disk, or null for untitled buffers.
@@ -17,6 +21,9 @@ pub struct Snapshot {
     pub encoding: String,
     /// Wire format matches src/stores/buffers.ts LineEnding union.
     pub eol: String,
+    /// Window this snapshot belongs to. Legacy entries default to "main".
+    #[serde(default = "default_window_label")]
+    pub window_label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,6 +128,19 @@ pub fn replay_at(journals_dir: &std::path::Path) -> std::io::Result<Vec<Restored
     Ok(out)
 }
 
+/// Replay only the entries whose snapshot.window_label matches `label`.
+/// Legacy entries (no field) deserialize to "main" via serde default.
+pub fn replay_for_label(
+    journals_dir: &std::path::Path,
+    label: &str,
+) -> std::io::Result<Vec<RestoredEntry>> {
+    let all = replay_at(journals_dir)?;
+    Ok(all
+        .into_iter()
+        .filter(|e| e.snapshot.window_label == label)
+        .collect())
+}
+
 #[cfg(test)]
 mod snapshot_tests {
     use super::*;
@@ -151,6 +171,7 @@ mod snapshot_tests {
             content: content.to_string(),
             encoding: "utf-8".to_string(),
             eol: "lf".to_string(),
+            window_label: "main".to_string(),
         }
     }
 
@@ -210,6 +231,7 @@ mod snapshot_tests {
             content: "fn main() {}".to_string(),
             encoding: "utf-16-le".to_string(),
             eol: "crlf".to_string(),
+            window_label: "main".to_string(),
         };
         snapshot_at(&dir, "bufrt", &s).unwrap();
         let content = std::fs::read_to_string(journal_file(&dir, "bufrt")).unwrap();
@@ -225,6 +247,7 @@ mod snapshot_tests {
             content: "untitled".to_string(),
             encoding: "utf-8".to_string(),
             eol: "lf".to_string(),
+            window_label: "main".to_string(),
         };
         snapshot_at(&dir, "bufu", &s).unwrap();
         let content = std::fs::read_to_string(journal_file(&dir, "bufu")).unwrap();
@@ -254,6 +277,7 @@ mod replay_tests {
             content: content.to_string(),
             encoding: "utf-8".to_string(),
             eol: "lf".to_string(),
+            window_label: "main".to_string(),
         }
     }
 
@@ -315,6 +339,27 @@ mod replay_tests {
     }
 
     #[test]
+    fn replay_filters_by_window_label_and_defaults_legacy_to_main() {
+        let dir = tmp();
+        // New entry tagged win-1:
+        snapshot_at(&dir, "b1", &Snapshot {
+            path: None, content: "x".into(), encoding: "utf-8".into(), eol: "lf".into(),
+            window_label: "win-1".into(),
+        }).unwrap();
+        // Legacy-style line (no window_label) written directly:
+        std::fs::write(dir.join("b2.jsonl"),
+            b"{\"path\":null,\"content\":\"y\",\"encoding\":\"utf-8\",\"eol\":\"lf\"}\n").unwrap();
+
+        let main_entries = replay_for_label(&dir, "main").unwrap();
+        assert!(main_entries.iter().any(|e| e.buffer_id == "b2"), "legacy entry → main");
+        assert!(!main_entries.iter().any(|e| e.buffer_id == "b1"));
+
+        let win1 = replay_for_label(&dir, "win-1").unwrap();
+        assert!(win1.iter().any(|e| e.buffer_id == "b1"));
+        assert!(!win1.iter().any(|e| e.buffer_id == "b2"));
+    }
+
+    #[test]
     fn corrupt_jsonl_file_is_skipped_not_panicked() {
         let dir = tmp();
         snapshot_at(&dir, "good", &snap("good", Some("/g.txt"))).unwrap();
@@ -346,6 +391,7 @@ mod clear_tests {
             content: "x".to_string(),
             encoding: "utf-8".to_string(),
             eol: "lf".to_string(),
+            window_label: "main".to_string(),
         }
     }
 
