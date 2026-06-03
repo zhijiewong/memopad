@@ -15,7 +15,7 @@ import { useWorkspace } from './stores/workspace';
 import { useRecentFiles } from './stores/recentFiles';
 import { useEditorPrefs } from './stores/editorPrefs';
 import { startJournalDebounce } from './lib/journal-debounce';
-import { startFsWatcher, stopFsWatcher } from './lib/fs-watcher';
+import { startFsWatcher, stopFsWatcher, checkWatcherAlive } from './lib/fs-watcher';
 import { bootRestore } from './lib/boot';
 import { statFile } from './lib/tauri';
 import { scheduleSessionSave } from './lib/session-debounce';
@@ -152,7 +152,11 @@ export default function App() {
     // window stays open until the handler is explicitly resolved. We use
     // window.destroy() on the Rust side to make X reliably close the app.
     const unlistenFocusP = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-      if (focused) rescanExternalChanges().catch(() => {});
+      if (focused) {
+        rescanExternalChanges().catch(() => {});
+        const folder = useWorkspace.getState().workspaceFolder;
+        if (folder) checkWatcherAlive(folder).catch(() => {});
+      }
     });
 
     return () => {

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-06-03
+
+### Fixed
+
+- The file tree now shows **"Live updates unavailable — refresh manually"** when the file
+  watcher fails to start or the workspace folder becomes inaccessible (deleted / renamed /
+  unmounted). Previously these failed silently and the tree could go stale without warning.
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- Watcher liveness is checked on window focus; a watcher that dies while the folder still
+  exists is not auto-detected
+- Split view is two panes max, horizontal only
+
 ## [0.10.0] — 2026-06-02
 
 ### Added
