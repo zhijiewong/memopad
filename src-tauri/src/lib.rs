@@ -6,8 +6,14 @@ mod session;
 mod stat;
 mod watcher;
 
+use std::collections::VecDeque;
 use std::process::Command;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tauri::Manager;
+
+struct SessionStore(std::sync::Mutex<session::AppSession>);
+struct RestoreQueue(std::sync::Mutex<VecDeque<session::WindowSession>>);
+struct WindowCounter(AtomicU32);
 
 #[tauri::command]
 fn window_minimize(window: tauri::Window) -> Result<(), String> {
@@ -73,9 +79,12 @@ fn journal_snapshot(
 }
 
 #[tauri::command]
-fn journal_replay(app: tauri::AppHandle) -> Result<Vec<journal::RestoredEntry>, String> {
+fn journal_replay(
+    app: tauri::AppHandle,
+    window_label: String,
+) -> Result<Vec<journal::RestoredEntry>, String> {
     let dir = journals_dir(&app)?;
-    journal::replay_at(&dir).map_err(|e| e.to_string())
+    journal::replay_for_label(&dir, &window_label).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -84,16 +93,99 @@ fn journal_clear(app: tauri::AppHandle, buffer_id: String) -> Result<(), String>
     journal::clear_at(&dir, &buffer_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-fn session_save(app: tauri::AppHandle, state: session::LegacySession) -> Result<(), String> {
-    let base = app_base_dir(&app)?;
-    session::save_at(&base, &state).map_err(|e| e.to_string())
+fn persist_session(app: &tauri::AppHandle, store: &SessionStore) {
+    if let Ok(base) = app_base_dir(app) {
+        if let Ok(s) = store.0.lock() {
+            let _ = session::save_app_session(&base, &s);
+        }
+    }
 }
 
 #[tauri::command]
-fn session_load(app: tauri::AppHandle) -> Result<session::LegacySession, String> {
-    let base = app_base_dir(&app)?;
-    Ok(session::load_at(&base))
+fn session_load(store: tauri::State<SessionStore>) -> session::AppSession {
+    store.0.lock().map(|s| s.clone()).unwrap_or_default()
+}
+
+#[tauri::command]
+fn session_claim_window(queue: tauri::State<RestoreQueue>) -> Option<session::WindowSession> {
+    queue.0.lock().ok().and_then(|mut q| q.pop_front())
+}
+
+#[tauri::command]
+fn session_pending_count(queue: tauri::State<RestoreQueue>) -> usize {
+    queue.0.lock().map(|q| q.len()).unwrap_or(0)
+}
+
+#[tauri::command]
+fn session_save_window(
+    app: tauri::AppHandle,
+    store: tauri::State<SessionStore>,
+    label: String,
+    window: session::WindowSession,
+) {
+    if let Ok(mut s) = store.0.lock() {
+        if let Some(slot) = s.windows.iter_mut().find(|w| w.label == label) {
+            *slot = window;
+        } else {
+            s.windows.push(window);
+        }
+    }
+    persist_session(&app, &store);
+}
+
+#[tauri::command]
+fn session_save_app(
+    app: tauri::AppHandle,
+    store: tauri::State<SessionStore>,
+    editor_prefs: session::EditorPrefs,
+    recent_folders: Vec<String>,
+    recent_files: Vec<String>,
+) {
+    if let Ok(mut s) = store.0.lock() {
+        s.editor_prefs = editor_prefs;
+        s.recent_folders = recent_folders;
+        s.recent_files = recent_files;
+    }
+    persist_session(&app, &store);
+}
+
+#[tauri::command]
+fn session_forget_window(
+    app: tauri::AppHandle,
+    store: tauri::State<SessionStore>,
+    label: String,
+) {
+    if let Ok(mut s) = store.0.lock() {
+        s.windows.retain(|w| w.label != label);
+    }
+    persist_session(&app, &store);
+}
+
+#[tauri::command]
+fn window_count(app: tauri::AppHandle) -> usize {
+    app.webview_windows().len()
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
+fn new_window(
+    app: tauri::AppHandle,
+    counter: tauri::State<WindowCounter>,
+) -> Result<String, String> {
+    let label = format!("win-{}", counter.0.fetch_add(1, Ordering::SeqCst));
+    tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("index.html".into()))
+        .title("Memopad")
+        .inner_size(1100.0, 720.0)
+        .min_inner_size(480.0, 320.0)
+        .decorations(false)
+        .resizable(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(label)
 }
 
 #[tauri::command]
@@ -211,6 +303,37 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(watcher::WatcherHandle(std::sync::Mutex::new(None)))
+        .setup(|app| {
+            // Resolve the data dir + load/migrate the session now that the
+            // AppHandle exists.
+            let base = app_base_dir(&app.handle())
+                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let app_session = session::load_app_session(&base);
+
+            // Seed the restore queue with every saved window slice; boot.ts on
+            // the main window claims its slice then spawns the rest.
+            let restore_q: VecDeque<session::WindowSession> =
+                app_session.windows.iter().cloned().collect();
+
+            // Next window-counter seed: above any restored win-N label.
+            let seed = app_session
+                .windows
+                .iter()
+                .filter_map(|w| w.label.strip_prefix("win-").and_then(|n| n.parse::<u32>().ok()))
+                .max()
+                .map(|m| m + 1)
+                .unwrap_or(0);
+
+            // In-memory reset of the canonical window list: it is rebuilt from
+            // live labels as each window saves its slice.
+            let mut canonical = app_session;
+            canonical.windows.clear();
+
+            app.manage(SessionStore(std::sync::Mutex::new(canonical)));
+            app.manage(RestoreQueue(std::sync::Mutex::new(restore_q)));
+            app.manage(WindowCounter(AtomicU32::new(seed)));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             window_minimize,
             window_toggle_maximize,
@@ -222,8 +345,15 @@ pub fn run() {
             journal_snapshot,
             journal_replay,
             journal_clear,
-            session_save,
             session_load,
+            session_claim_window,
+            session_pending_count,
+            session_save_window,
+            session_save_app,
+            session_forget_window,
+            window_count,
+            quit_app,
+            new_window,
             stat_file,
             find_in_folder,
             list_dir,

@@ -176,7 +176,10 @@ pub fn save_app_session(base_dir: &std::path::Path, app: &AppSession) -> std::io
     Ok(())
 }
 
-/// Atomically write the session JSON to `<base_dir>/session.json`.
+/// Atomically write the legacy session JSON to `<base_dir>/session.json`.
+/// Test-only: production now uses `save_app_session`; retained so the legacy
+/// round-trip / migration tests can exercise the on-disk legacy format.
+#[cfg(test)]
 pub fn save_at(base_dir: &std::path::Path, state: &LegacySession) -> std::io::Result<()> {
     use std::io::Write;
     std::fs::create_dir_all(base_dir)?;
@@ -193,7 +196,9 @@ pub fn save_at(base_dir: &std::path::Path, state: &LegacySession) -> std::io::Re
     Ok(())
 }
 
-/// Read the session JSON. Returns `Default` if the file is missing or unparseable.
+/// Read the legacy session JSON. Returns `Default` if missing or unparseable.
+/// Test-only (see `save_at`).
+#[cfg(test)]
 pub fn load_at(base_dir: &std::path::Path) -> LegacySession {
     let content = match std::fs::read_to_string(session_path(base_dir)) {
         Ok(c) => c,
