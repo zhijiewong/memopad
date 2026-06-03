@@ -85,13 +85,13 @@ fn journal_clear(app: tauri::AppHandle, buffer_id: String) -> Result<(), String>
 }
 
 #[tauri::command]
-fn session_save(app: tauri::AppHandle, state: session::SessionState) -> Result<(), String> {
+fn session_save(app: tauri::AppHandle, state: session::LegacySession) -> Result<(), String> {
     let base = app_base_dir(&app)?;
     session::save_at(&base, &state).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn session_load(app: tauri::AppHandle) -> Result<session::SessionState, String> {
+fn session_load(app: tauri::AppHandle) -> Result<session::LegacySession, String> {
     let base = app_base_dir(&app)?;
     Ok(session::load_at(&base))
 }
