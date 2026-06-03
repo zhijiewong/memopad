@@ -140,9 +140,9 @@ export async function sessionPendingCount(): Promise<number> {
   }
 }
 
-export async function sessionSaveWindow(label: string, window: WindowSession): Promise<void> {
+export async function sessionSaveWindow(windowSession: WindowSession): Promise<void> {
   try {
-    await invoke<void>('session_save_window', { label, window });
+    await invoke<void>('session_save_window', { window: windowSession });
   } catch (e) {
     throw asError(e);
   }

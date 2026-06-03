@@ -33,7 +33,7 @@ function runCommand(id: string) {
 }
 
 function persistWindow(label: string) {
-  sessionSaveWindow(label, currentWindowSession(label)).catch(() => {});
+  sessionSaveWindow(currentWindowSession(label)).catch(() => {});
 }
 
 function persistApp() {

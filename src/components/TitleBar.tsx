@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { windowCount, sessionForgetWindow } from '../lib/tauri';
 import { TabStrip } from './TabStrip';
 
-/** Close this window's X: forget its saved session unless it's the last window. */
+/**
+ * Close this window. The Rust `window_close` command forgets this window's saved
+ * session iff other windows remain (so the last window's close keeps the layout),
+ * doing the count+forget atomically to avoid racing two closes.
+ */
 async function closeThisWindow() {
-  const n = await windowCount().catch(() => 1);
-  if (n > 1) {
-    await sessionForgetWindow(getCurrentWindow().label).catch(() => {});
-  }
   await invoke('window_close').catch(console.error);
 }
 

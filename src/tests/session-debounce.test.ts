@@ -6,8 +6,8 @@ vi.mock('../lib/tauri', async (importOriginal) => {
   const original = await importOriginal<typeof import('../lib/tauri')>();
   return {
     ...original,
-    sessionSaveWindow: (label: string, window: WindowSession) => {
-      saveSpy(label, window);
+    sessionSaveWindow: (windowSession: WindowSession) => {
+      saveSpy(windowSession);
       return Promise.resolve();
     },
   };
@@ -34,7 +34,7 @@ describe('session-debounce', () => {
     expect(saveSpy).not.toHaveBeenCalled();
     vi.advanceTimersByTime(SESSION_DEBOUNCE_MS);
     expect(saveSpy).toHaveBeenCalledTimes(1);
-    expect(saveSpy.mock.calls[0][0]).to.equal('main');
+    expect((saveSpy.mock.calls[0][0] as WindowSession).label).to.equal('main');
   });
 
   it('coalesces rapid calls into one save with the latest payload', () => {
@@ -45,7 +45,7 @@ describe('session-debounce', () => {
     scheduleSessionSave(ws('main', 'c'));
     vi.advanceTimersByTime(SESSION_DEBOUNCE_MS);
     expect(saveSpy).toHaveBeenCalledTimes(1);
-    const last = saveSpy.mock.calls[0][1] as WindowSession;
+    const last = saveSpy.mock.calls[0][0] as WindowSession;
     expect(last.active_id).to.equal('c');
   });
 

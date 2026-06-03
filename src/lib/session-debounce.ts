@@ -10,7 +10,7 @@ function fire() {
   const state = pendingState;
   pendingState = undefined;
   pendingTimer = undefined;
-  sessionSaveWindow(state.label, state).catch((err) => {
+  sessionSaveWindow(state).catch((err) => {
     console.error('sessionSaveWindow failed:', err);
   });
 }
@@ -34,5 +34,5 @@ export async function flushSessionSave(): Promise<void> {
   if (!pendingState) return;
   const state = pendingState;
   pendingState = undefined;
-  await sessionSaveWindow(state.label, state);
+  await sessionSaveWindow(state);
 }

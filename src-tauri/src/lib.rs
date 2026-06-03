@@ -31,12 +31,27 @@ fn window_toggle_maximize(window: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn window_close(window: tauri::Window) -> Result<(), String> {
+fn window_close(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    store: tauri::State<SessionStore>,
+) -> Result<(), String> {
     // Use destroy(), not close(): close() emits a CloseRequested JS event,
     // which (with our subscription model) caused the window to remain open
-    // on Windows/WebView2. The store subscription has already persisted
-    // session.json on every state change, so we don't need to drain
-    // anything before tearing down the window.
+    // on Windows/WebView2.
+    //
+    // Forget this window from the session ONLY if other windows remain — so
+    // X-closing one window of several drops it from next-launch restore, while
+    // closing the LAST window keeps the layout (quit-by-last-close restores).
+    // Doing the count + forget here (not via a separate frontend RPC then close)
+    // keeps the decision atomic, so two closes can't race into both forgetting.
+    if app.webview_windows().len() > 1 {
+        let label = window.label().to_string();
+        if let Ok(mut s) = store.0.lock() {
+            s.windows.retain(|w| w.label != label);
+        }
+        persist_session(&app, &store);
+    }
     window.destroy().map_err(|e| e.to_string())
 }
 
@@ -120,11 +135,12 @@ fn session_pending_count(queue: tauri::State<RestoreQueue>) -> usize {
 fn session_save_window(
     app: tauri::AppHandle,
     store: tauri::State<SessionStore>,
-    label: String,
     window: session::WindowSession,
 ) {
+    // Key the upsert by the session's own label (single source of truth) so a
+    // caller can't desync the map key from the stored window's label.
     if let Ok(mut s) = store.0.lock() {
-        if let Some(slot) = s.windows.iter_mut().find(|w| w.label == label) {
+        if let Some(slot) = s.windows.iter_mut().find(|w| w.label == window.label) {
             *slot = window;
         } else {
             s.windows.push(window);
