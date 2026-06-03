@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-06-02
+
+### Added
+
+- **Recent files** — `Ctrl+E` opens a quick-pick of recently edited files (most-recent first),
+  via the command palette. Persisted across relaunch; entries that no longer exist are dropped
+  when selected.
+
+### Known limitations
+
+- Windows only
+- Unsigned MSI — SmartScreen warning on first install
+- Recent files is a global MRU (no per-workspace scoping or pinning)
+- Split view is two panes max, horizontal only
+
 ## [0.9.0] — 2026-06-02
 
 ### Added

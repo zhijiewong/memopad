@@ -2,6 +2,7 @@ import { useBuffers, type Encoding, type LineEnding } from '../stores/buffers';
 import { journalReplay, sessionLoad, openFile, type SessionState } from './tauri';
 import { useWorkspace } from '../stores/workspace';
 import { useEditorPrefs } from '../stores/editorPrefs';
+import { useRecentFiles } from '../stores/recentFiles';
 
 function asEncoding(s: string): Encoding {
   if (s === 'utf-8' || s === 'utf-8-bom' || s === 'utf-16-le' || s === 'utf-16-be') return s;
@@ -58,6 +59,8 @@ export async function bootRestore(): Promise<void> {
   } else {
     useWorkspace.getState().setRecent(fromSession);
   }
+
+  useRecentFiles.getState().setRecent(session.recent_files ?? []);
 
   const journalById = new Map(journalEntries.map((e) => [e.buffer_id, e]));
   const tabById = new Map(session.tabs.map((t) => [t.buffer_id, t]));

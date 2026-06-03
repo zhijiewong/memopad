@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useRecentFiles } from './recentFiles';
 
 export type Encoding = 'utf-8' | 'utf-8-bom' | 'utf-16-le' | 'utf-16-be';
 export type LineEnding = 'lf' | 'crlf' | 'cr';
@@ -146,6 +147,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
   },
 
   openBuffer: (file) => {
+    useRecentFiles.getState().push(file.path);
     const existing = get().buffers.find((b) => b.path === file.path);
     if (existing) {
       set((s) => routeToFocusedPane(s, existing.id));
