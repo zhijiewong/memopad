@@ -1,22 +1,25 @@
-import { sessionSave, type SessionState } from './tauri';
+import { sessionSaveWindow, type WindowSession } from './tauri';
 
 export const SESSION_DEBOUNCE_MS = 500;
 
 let pendingTimer: ReturnType<typeof setTimeout> | undefined;
-let pendingState: SessionState | undefined;
+let pendingState: WindowSession | undefined;
 
 function fire() {
   if (!pendingState) return;
   const state = pendingState;
   pendingState = undefined;
   pendingTimer = undefined;
-  sessionSave(state).catch((err) => {
-    console.error('sessionSave failed:', err);
+  sessionSaveWindow(state.label, state).catch((err) => {
+    console.error('sessionSaveWindow failed:', err);
   });
 }
 
-/** Schedule a session save after SESSION_DEBOUNCE_MS of idle. Coalesces. */
-export function scheduleSessionSave(state: SessionState): void {
+/**
+ * Schedule a per-window session save after SESSION_DEBOUNCE_MS of idle.
+ * Coalesces rapid calls into a single save with the latest WindowSession.
+ */
+export function scheduleSessionSave(state: WindowSession): void {
   pendingState = state;
   if (pendingTimer) clearTimeout(pendingTimer);
   pendingTimer = setTimeout(fire, SESSION_DEBOUNCE_MS);
@@ -31,5 +34,5 @@ export async function flushSessionSave(): Promise<void> {
   if (!pendingState) return;
   const state = pendingState;
   pendingState = undefined;
-  await sessionSave(state);
+  await sessionSaveWindow(state.label, state);
 }

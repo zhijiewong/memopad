@@ -330,4 +330,17 @@ export function registerBuiltins() {
         .__memopadShowQuickOpen?.();
     },
   });
+
+  register({
+    id: 'window.new',
+    title: 'New Window',
+    shortcut: 'Ctrl+Shift+N',
+    run: () => { import('../lib/tauri').then((m) => m.newWindow().catch(() => {})); },
+  });
+  register({
+    id: 'app.quit',
+    title: 'Quit Memopad',
+    shortcut: 'Ctrl+Q',
+    run: () => { import('../lib/tauri').then((m) => m.quitApp().catch(() => {})); },
+  });
 }

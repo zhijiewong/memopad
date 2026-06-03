@@ -17,11 +17,13 @@ import { useEditorPrefs } from './stores/editorPrefs';
 import { startJournalDebounce } from './lib/journal-debounce';
 import { startFsWatcher, stopFsWatcher, checkWatcherAlive } from './lib/fs-watcher';
 import { bootRestore } from './lib/boot';
-import { statFile } from './lib/tauri';
-import { scheduleSessionSave } from './lib/session-debounce';
+import { statFile, sessionSaveWindow, sessionSaveApp } from './lib/tauri';
+import { currentWindowSession } from './lib/window-session';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 registerBuiltins();
+
+const winLabel = getCurrentWindow().label;
 
 function runCommand(id: string) {
   const cmd = useCommands.getState().commands.find((c) => c.id === id);
@@ -30,31 +32,20 @@ function runCommand(id: string) {
   cmd.run();
 }
 
-function persistSession() {
-  const state = useBuffers.getState();
-  const folder = useWorkspace.getState().workspaceFolder;
-  const recent = useWorkspace.getState().recentFolders;
-  scheduleSessionSave({
-    tabs: state.buffers.map((b) => ({
-      buffer_id: b.id,
-      path: b.path,
-      cursor: b.cursor,
-      scroll_top: b.scrollTop,
-    })),
-    active_id: state.activeId,
-    workspace_folder: folder,
-    recent_folders: recent,
-    recent_files: useRecentFiles.getState().recentFiles,
-    split_active: state.splitActive,
-    secondary_id: state.secondaryId,
-    focused_pane: state.focusedPane,
-    secondary_pane_state: Array.from(state.secondaryPaneState.entries()).map(
-      ([bufferId, v]) => ({ buffer_id: bufferId, cursor: v.cursor, scroll_top: v.scrollTop }),
-    ),
-    word_wrap: useEditorPrefs.getState().wordWrap,
-    indent_guides: useEditorPrefs.getState().indentGuides,
-    minimap: useEditorPrefs.getState().minimap,
-  });
+function persistWindow(label: string) {
+  sessionSaveWindow(label, currentWindowSession(label)).catch(() => {});
+}
+
+function persistApp() {
+  sessionSaveApp(
+    {
+      word_wrap: useEditorPrefs.getState().wordWrap,
+      indent_guides: useEditorPrefs.getState().indentGuides,
+      minimap: useEditorPrefs.getState().minimap,
+    },
+    useWorkspace.getState().recentFolders,
+    useRecentFiles.getState().recentFiles,
+  ).catch(() => {});
 }
 
 async function recordStatsForBuffersWithoutOne() {
@@ -114,14 +105,17 @@ export default function App() {
 
     const stopJournal = startJournalDebounce();
     const stopSessionWatcher = useBuffers.subscribe(() => {
-      persistSession();
+      persistWindow(winLabel);
       recordStatsForBuffersWithoutOne().catch(() => {});
     });
+    // Workspace folder is per-window; the recent-folders list is app-global, so
+    // a workspace change must update both slices.
     const stopWorkspaceWatcher = useWorkspace.subscribe(() => {
-      persistSession();
+      persistWindow(winLabel);
+      persistApp();
     });
     const stopEditorPrefsWatcher = useEditorPrefs.subscribe(() => {
-      persistSession();
+      persistApp();
     });
     const stopRecentWatcher = useWorkspace.subscribe((state, prev) => {
       if (state.recentFolders !== prev.recentFolders) {
@@ -131,7 +125,7 @@ export default function App() {
     const stopRecentFilesWatcher = useRecentFiles.subscribe((state, prev) => {
       if (state.recentFiles !== prev.recentFiles) {
         registerRecentFileCommands(state.recentFiles);
-        persistSession();
+        persistApp();
       }
     });
     const stopWatcherSync = useWorkspace.subscribe((state, prev) => {
@@ -206,6 +200,8 @@ export default function App() {
       if (!mod) return;
       const key = e.key.toLowerCase();
 
+      if (key === 'n' && e.shiftKey) { e.preventDefault(); runCommand('window.new'); return; }
+      if (key === 'q' && !e.shiftKey) { e.preventDefault(); runCommand('app.quit'); return; }
       if (key === 'g' && !e.shiftKey) {
         e.preventDefault();
         (window as unknown as { __memopadOpenGotoLine?: () => void }).__memopadOpenGotoLine?.();

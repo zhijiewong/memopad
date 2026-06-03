@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useBuffers } from '../stores/buffers';
 
+vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ label: 'main' }) }));
+
 // Mock the IPC wrappers — we are testing the debounce logic, not real Tauri calls.
 const snapshotSpy = vi.fn();
 const clearSpy = vi.fn();
