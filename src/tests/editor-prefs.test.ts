@@ -38,7 +38,18 @@ describe('useEditorPrefs', () => {
 import { vi } from 'vitest';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
-import { applyEditorPrefsFromSession } from '../lib/boot';
+import { applyAppGlobal } from '../lib/window-session';
+import type { EditorPrefsWire, AppSession } from '../lib/tauri';
+
+function applyEditorPrefsFromSession(prefs: EditorPrefsWire): void {
+  const app: AppSession = {
+    windows: [],
+    editor_prefs: prefs,
+    recent_folders: [],
+    recent_files: [],
+  };
+  applyAppGlobal(app);
+}
 
 describe('useEditorPrefs minimap', () => {
   beforeEach(() => useEditorPrefs.getState().reset());
