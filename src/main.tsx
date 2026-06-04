@@ -6,8 +6,10 @@ import { useBuffers, selectActive } from './stores/buffers';
 import { useEditorPrefs } from './stores/editorPrefs';
 import { useCursorPos } from './stores/cursorPos';
 import { useRecentFiles } from './stores/recentFiles';
+import { useCommands } from './commands/registry';
 
 const w = window as unknown as {
+  __memopadTestCommandIds?: () => string[];
   __memopadTestSetContent?: (s: string) => void;
   __memopadTestGetContent?: () => string;
   __memopadTestReset?: () => void;
@@ -72,6 +74,7 @@ w.__memopadTestEditorPrefs = () => ({
   minimap: useEditorPrefs.getState().minimap,
 });
 w.__memopadTestResetEditorPrefs = () => useEditorPrefs.getState().reset();
+w.__memopadTestCommandIds = () => useCommands.getState().commands.map((c) => c.id);
 w.__memopadTestCursorPos = () => ({
   line: useCursorPos.getState().line,
   col: useCursorPos.getState().col,

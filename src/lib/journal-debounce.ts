@@ -1,5 +1,6 @@
 import { useBuffers, type Buffer } from '../stores/buffers';
 import { journalSnapshot, journalClear, type JournalSnapshot } from './tauri';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export const JOURNAL_DEBOUNCE_MS = 250;
 
@@ -9,6 +10,7 @@ function snapshotOf(b: Buffer): JournalSnapshot {
     content: b.content,
     encoding: b.encoding,
     eol: b.eol,
+    window_label: getCurrentWindow().label,
   };
 }
 

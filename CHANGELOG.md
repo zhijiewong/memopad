@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-06-03
+
+### Added
+
+- **Multiple windows** — open a new window with **New Window (`Ctrl+Shift+N`)**; each window has
+  its own tabs, workspace, and split. All open windows are restored on relaunch.
+- **Quit (`Ctrl+Q`)** closes the app while preserving the window layout for next launch; closing
+  a single window with its × forgets just that window.
+
+### Changed
+
+- The session file now stores per-window state plus shared editor preferences / recent lists.
+  Existing sessions are migrated automatically on first launch.
+
+### Known limitations
+
+- Windows only; unsigned MSI (SmartScreen on first install)
+- No cross-window tab drag; two horizontal panes max per window
+
 ## [0.11.0] — 2026-06-03
 
 ### Fixed

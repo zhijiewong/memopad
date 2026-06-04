@@ -3,6 +3,15 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { TabStrip } from './TabStrip';
 
+/**
+ * Close this window. The Rust `window_close` command forgets this window's saved
+ * session iff other windows remain (so the last window's close keeps the layout),
+ * doing the count+forget atomically to avoid racing two closes.
+ */
+async function closeThisWindow() {
+  await invoke('window_close').catch(console.error);
+}
+
 export function TitleBar() {
   const [maximized, setMaximized] = useState(false);
 
@@ -75,7 +84,7 @@ export function TitleBar() {
           className="flex h-full w-11 items-center justify-center hover:text-white"
           onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--app-danger)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = '')}
-          onClick={() => invoke('window_close').catch(console.error)}
+          onClick={() => closeThisWindow()}
         >
           &times;
         </button>

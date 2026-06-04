@@ -1,8 +1,18 @@
 import { useBuffers, type Encoding, type LineEnding } from '../stores/buffers';
-import { journalReplay, sessionLoad, openFile, type SessionState } from './tauri';
+import {
+  journalReplay,
+  sessionLoad,
+  sessionClaimWindow,
+  sessionPendingCount,
+  newWindow,
+  openFile,
+  type AppSession,
+  type WindowSession,
+  type RestoredEntry,
+} from './tauri';
 import { useWorkspace } from '../stores/workspace';
-import { useEditorPrefs } from '../stores/editorPrefs';
-import { useRecentFiles } from '../stores/recentFiles';
+import { applyAppGlobal } from './window-session';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 function asEncoding(s: string): Encoding {
   if (s === 'utf-8' || s === 'utf-8-bom' || s === 'utf-16-le' || s === 'utf-16-be') return s;
@@ -13,45 +23,44 @@ function asEol(s: string): LineEnding {
   return 'lf';
 }
 
-/** Apply persisted editor prefs from a loaded session; null/absent keeps store defaults. */
-export function applyEditorPrefsFromSession(
-  session: { word_wrap?: boolean | null; indent_guides?: boolean | null; minimap?: boolean | null },
-): void {
-  if (session.word_wrap != null) useEditorPrefs.getState().setWordWrap(session.word_wrap);
-  if (session.indent_guides != null) useEditorPrefs.getState().setIndentGuides(session.indent_guides);
-  if (session.minimap != null) useEditorPrefs.getState().setMinimap(session.minimap);
-}
-
 /**
- * One-shot startup: restore buffers from journal + session.
- * Idempotent — if buffers already exist, does nothing.
+ * One-shot startup: restore this window's buffers from journal + its claimed
+ * window session, apply app-global prefs/recents, then (main only) spawn the
+ * remaining saved windows. Idempotent — if buffers already exist, does nothing.
  */
 export async function bootRestore(): Promise<void> {
   if (useBuffers.getState().buffers.length > 0) return;
 
-  const [journalEntries, session] = await Promise.all([
-    journalReplay().catch((err) => {
+  const label = getCurrentWindow().label;
+
+  const app = await sessionLoad().catch((err) => {
+    console.error('session_load failed at boot:', err);
+    const fallback: AppSession = {
+      windows: [],
+      editor_prefs: {},
+      recent_folders: [],
+      recent_files: [],
+    };
+    return fallback;
+  });
+
+  applyAppGlobal(app);
+
+  const [journalEntries, claimed] = await Promise.all([
+    journalReplay(label).catch((err) => {
       console.error('journal_replay failed at boot:', err);
-      return [];
+      return [] as RestoredEntry[];
     }),
-    sessionLoad().catch((err) => {
-      console.error('session_load failed at boot:', err);
-      const fallback: SessionState = {
-        tabs: [],
-        active_id: null,
-        workspace_folder: null,
-        recent_folders: [],
-      };
-      return fallback;
+    sessionClaimWindow().catch((err) => {
+      console.error('session_claim_window failed at boot:', err);
+      return null;
     }),
   ]);
 
-  useWorkspace.getState().setFolder(session.workspace_folder ?? null);
-
-  applyEditorPrefsFromSession(session);
-
-  const fromSession = session.recent_folders ?? [];
-  const wf = session.workspace_folder;
+  // Restore the app-global recent-folders list, prepending this window's
+  // workspace folder (mirrors the pre-multi-window behavior).
+  const fromSession = app.recent_folders ?? [];
+  const wf = claimed?.workspace_folder ?? null;
   if (wf) {
     const lower = wf.toLowerCase();
     const filtered = fromSession.filter((p) => p.toLowerCase() !== lower);
@@ -60,10 +69,30 @@ export async function bootRestore(): Promise<void> {
     useWorkspace.getState().setRecent(fromSession);
   }
 
-  useRecentFiles.getState().setRecent(session.recent_files ?? []);
+  await restoreWindow(claimed, journalEntries);
 
+  if (label === 'main') {
+    const pending = await sessionPendingCount().catch(() => 0);
+    for (let i = 0; i < pending; i++) {
+      await newWindow().catch((e) => console.warn('spawn window failed:', e));
+    }
+  }
+}
+
+/**
+ * Restore a single window's tabs / active buffer / split layout from its
+ * claimed WindowSession plus the per-window journal entries. The journal
+ * provides dirty (unsaved) buffer contents; clean tabs are reopened from disk.
+ */
+async function restoreWindow(
+  claimed: WindowSession | null,
+  journalEntries: RestoredEntry[],
+): Promise<void> {
+  useWorkspace.getState().setFolder(claimed?.workspace_folder ?? null);
+
+  const tabs = claimed?.tabs ?? [];
   const journalById = new Map(journalEntries.map((e) => [e.buffer_id, e]));
-  const tabById = new Map(session.tabs.map((t) => [t.buffer_id, t]));
+  const tabById = new Map(tabs.map((t) => [t.buffer_id, t]));
 
   // First pass: restore dirty buffers from journals (id-preserving).
   for (const entry of journalEntries) {
@@ -82,7 +111,7 @@ export async function bootRestore(): Promise<void> {
 
   // Second pass: for each session tab that does NOT have a journal AND has a
   // path on disk, open it as a clean buffer.
-  for (const tab of session.tabs) {
+  for (const tab of tabs) {
     if (journalById.has(tab.buffer_id)) continue;
     if (tab.path == null) continue; // untitled-clean: nothing to restore
     try {
@@ -107,17 +136,18 @@ export async function bootRestore(): Promise<void> {
   // Activate the recorded active id if it exists in the store; otherwise first.
   const state = useBuffers.getState();
   if (state.buffers.length === 0) return;
+  const activeId = claimed?.active_id ?? null;
   const target =
-    session.active_id && state.buffers.some((b) => b.id === session.active_id)
-      ? session.active_id
+    activeId && state.buffers.some((b) => b.id === activeId)
+      ? activeId
       : state.buffers[0].id;
   useBuffers.getState().switchTo(target);
 
   useBuffers.getState().restoreSplitState({
-    splitActive: session.split_active ?? false,
-    secondaryId: session.secondary_id ?? null,
-    focusedPane: session.focused_pane ?? 'primary',
-    secondaryPaneState: (session.secondary_pane_state ?? []).map((p) => ({
+    splitActive: claimed?.split_active ?? false,
+    secondaryId: claimed?.secondary_id ?? null,
+    focusedPane: claimed?.focused_pane ?? 'primary',
+    secondaryPaneState: (claimed?.secondary_pane_state ?? []).map((p) => ({
       bufferId: p.buffer_id,
       cursor: p.cursor ?? null,
       scrollTop: p.scroll_top ?? null,
