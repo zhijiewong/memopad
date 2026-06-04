@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-06-04
+
+First stable release. Memopad is now a complete "quiet Notepad++ alternative": a fast,
+crash-safe editor with a full file manager and multiple restorable windows. This release
+is a stability milestone over 0.12.0 — no new features beyond it; the README is refreshed
+to cover the full feature set built across 0.4.0–0.12.0.
+
+Highlights since 0.1.0:
+
+- **Editing** — multi-buffer tabs, split view, find/replace, word wrap, indent guides,
+  minimap, line operations (duplicate / move / delete), Go to Line + Ln/Col indicator,
+  encoding-aware I/O, dark/light themes.
+- **Files** — workspace folder, file-tree sidebar with full CRUD (create / rename /
+  delete-to-Recycle-Bin) and drag-to-move, find/replace in files, quick open, recent
+  files and folders, a live filesystem watcher with failure detection.
+- **Windows** — multiple independent windows, each restored on relaunch; Quit preserves
+  the layout.
+- **Reliability** — per-keystroke crash journal (per window), session restore,
+  external-change detection, command palette, auto-update.
+
 ## [0.12.0] — 2026-06-03
 
 ### Added
