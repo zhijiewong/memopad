@@ -192,6 +192,11 @@ export function registerBuiltins() {
     title: 'View: Toggle Minimap',
     run: () => useEditorPrefs.getState().toggleMinimap(),
   });
+  register({
+    id: 'view.setLanguage',
+    title: 'View: Set Language…',
+    run: () => (window as unknown as { __memopadOpenLanguagePicker?: () => void }).__memopadOpenLanguagePicker?.(),
+  });
 
   register({
     id: 'edit.find',

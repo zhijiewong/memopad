@@ -17,7 +17,7 @@ import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import { showMinimap } from '@replit/codemirror-minimap';
 import { useEditorPrefs } from '../stores/editorPrefs';
 import { useBuffers, selectPaneState } from '../stores/buffers';
-import { languageForPath } from '../lib/language';
+import { effectiveLanguageId, languageExtensionsById } from '../lib/language';
 import { useTheme, effectiveTheme } from '../stores/theme';
 import { useCursorPos } from '../stores/cursorPos';
 import { memopadDark } from '../editor/memopad-dark';
@@ -311,7 +311,7 @@ export function EditorPane(props: EditorPaneProps) {
               displayText: 'blocks' as const,
               showOverlay: 'always' as const,
             }))] : []),
-            ...languageForPath(buffer.path),
+            ...languageExtensionsById(effectiveLanguageId(buffer)),
           ]}
           onChange={setActiveContent}
           onCreateEditor={(view) => {
