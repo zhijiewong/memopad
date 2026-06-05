@@ -419,6 +419,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
               externalChange: false,
               cursor: null,
               scrollTop: null,
+              languageId: undefined,
             }
           : b,
       ),

@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { useBuffers, selectActive } from './stores/buffers';
+import { useBuffers, selectActive, selectFocused } from './stores/buffers';
 import { effectiveLanguageId } from './lib/language';
 import { useEditorPrefs } from './stores/editorPrefs';
 import { useCursorPos } from './stores/cursorPos';
@@ -86,7 +86,7 @@ w.__memopadTestRecentFiles = () => useRecentFiles.getState().recentFiles;
 w.__memopadTestResetRecentFiles = () => useRecentFiles.getState().clear();
 w.__memopadTestSetLanguage = (id) => useBuffers.getState().setActiveLanguage(id);
 w.__memopadTestLanguageId = () => {
-  const b = selectActive(useBuffers.getState());
+  const b = selectFocused(useBuffers.getState());
   return b ? effectiveLanguageId(b) : 'plain';
 };
 

@@ -720,4 +720,12 @@ describe('buffers store — language override', () => {
     const b = useBuffers.getState().buffers.find((x) => x.id === id)!;
     expect(b.languageId).to.equal(null);
   });
+
+  it('replaceBuffer (external reload) clears a stale language override', () => {
+    const id = useBuffers.getState().openBuffer({ path: '/a/x.py', content: '', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().setActiveLanguage('javascript');
+    useBuffers.getState().replaceBuffer(id, { path: '/a/x.py', content: 'reloaded', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().buffers.find((x) => x.id === id)!;
+    expect(b.languageId ?? null).to.equal(null);
+  });
 });
