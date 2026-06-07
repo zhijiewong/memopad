@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-06-07
+
+### Added
+
+- **Syntax highlighting** — broad language coverage (~30 languages, including JavaScript/
+  TypeScript, JSON, Markdown, Rust, Python, HTML, CSS, XML, SQL, C/C++, Java, PHP, YAML,
+  TOML, shell, Go, Ruby, Lua, Perl, PowerShell, C#, Kotlin, Scala, Swift, R, Dockerfile,
+  CMake, diff, and `.properties`). The language is auto-detected from the file name or
+  extension when a file is opened.
+- **Language picker** — a clickable **language** segment in the status bar opens a
+  filterable picker to override the language for the current buffer; **Auto-detect** reverts
+  to the detected language. Also reachable via the **View: Set Language…** command. The
+  override lives only in memory for the focused buffer and resets when the file is reloaded
+  from disk.
+
 ## [1.0.0] — 2026-06-04
 
 First stable release. Memopad is now a complete "quiet Notepad++ alternative": a fast,
