@@ -18,6 +18,7 @@ import { showMinimap } from '@replit/codemirror-minimap';
 import { useEditorPrefs } from '../stores/editorPrefs';
 import { useBuffers, selectPaneState } from '../stores/buffers';
 import { effectiveLanguageId, languageExtensionsById } from '../lib/language';
+import { matchingBracketTarget } from '../lib/brackets';
 import { useTheme, effectiveTheme } from '../stores/theme';
 import { useCursorPos } from '../stores/cursorPos';
 import { memopadDark } from '../editor/memopad-dark';
@@ -52,6 +53,30 @@ declare global {
   var __memopadGotoLine: ((n: number) => void) | undefined;
   // eslint-disable-next-line no-var
   var __memopadLineCommand: ((cmd: 'moveUp' | 'moveDown' | 'duplicate' | 'delete') => void) | undefined;
+  // eslint-disable-next-line no-var
+  var __memopadBracketCommand: ((cmd: 'goto' | 'select') => void) | undefined;
+}
+
+function goToMatchingBracket(view: EditorView): boolean {
+  const pos = view.state.selection.main.head;
+  const target = matchingBracketTarget(view.state, pos);
+  if (target == null) return false;
+  view.dispatch({
+    selection: { anchor: target, head: target },
+    effects: EditorView.scrollIntoView(target),
+  });
+  return true;
+}
+
+function selectToMatchingBracket(view: EditorView): boolean {
+  const { anchor, head } = view.state.selection.main;
+  const target = matchingBracketTarget(view.state, head);
+  if (target == null) return false;
+  view.dispatch({
+    selection: { anchor, head: target },
+    effects: EditorView.scrollIntoView(target),
+  });
+  return true;
 }
 
 export interface EditorPaneProps {
@@ -246,10 +271,17 @@ export function EditorPane(props: EditorPaneProps) {
       fn(v);
       v.focus();
     };
+    globalThis.__memopadBracketCommand = (cmd) => {
+      const v = viewRef.current;
+      if (!v) return;
+      (cmd === 'select' ? selectToMatchingBracket : goToMatchingBracket)(v);
+      v.focus();
+    };
     return () => {
       globalThis.__memopadSearchPanel = undefined;
       globalThis.__memopadGotoLine = undefined;
       globalThis.__memopadLineCommand = undefined;
+      globalThis.__memopadBracketCommand = undefined;
     };
   }, [props.focused]);
 
@@ -303,7 +335,10 @@ export function EditorPane(props: EditorPaneProps) {
             editorTheme,
             themeExt,
             search(),
-            Prec.high(keymap.of([{ key: 'Mod-d', run: copyLineDown, preventDefault: true }])),
+            Prec.high(keymap.of([
+              { key: 'Mod-d', run: copyLineDown, preventDefault: true },
+              { key: 'Mod-Shift-\\', run: goToMatchingBracket, preventDefault: true },
+            ])),
             ...(wordWrap ? [EditorView.lineWrapping] : []),
             ...(indentGuides ? [indentationMarkers()] : []),
             ...(minimap ? [showMinimap.compute([], () => ({
