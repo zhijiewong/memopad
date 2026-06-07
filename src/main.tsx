@@ -2,7 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { useBuffers, selectActive } from './stores/buffers';
+import { useBuffers, selectActive, selectFocused } from './stores/buffers';
+import { effectiveLanguageId } from './lib/language';
 import { useEditorPrefs } from './stores/editorPrefs';
 import { useCursorPos } from './stores/cursorPos';
 import { useRecentFiles } from './stores/recentFiles';
@@ -44,6 +45,8 @@ const w = window as unknown as {
   __memopadTestCursorPos?: () => { line: number; col: number };
   __memopadTestRecentFiles?: () => string[];
   __memopadTestResetRecentFiles?: () => void;
+  __memopadTestSetLanguage?: (id: string | null) => void;
+  __memopadTestLanguageId?: () => string;
 };
 
 w.__memopadTestSetContent = (s) => useBuffers.getState().setActiveContent(s);
@@ -81,6 +84,11 @@ w.__memopadTestCursorPos = () => ({
 });
 w.__memopadTestRecentFiles = () => useRecentFiles.getState().recentFiles;
 w.__memopadTestResetRecentFiles = () => useRecentFiles.getState().clear();
+w.__memopadTestSetLanguage = (id) => useBuffers.getState().setActiveLanguage(id);
+w.__memopadTestLanguageId = () => {
+  const b = selectFocused(useBuffers.getState());
+  return b ? effectiveLanguageId(b) : 'plain';
+};
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

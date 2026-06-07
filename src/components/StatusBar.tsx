@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useBuffers, selectFocused, type Encoding, type LineEnding } from '../stores/buffers';
 import { EncodingPopover } from './EncodingPopover';
 import { EolPopover } from './EolPopover';
+import { LanguagePopover } from './LanguagePopover';
 import { useEditorPrefs } from '../stores/editorPrefs';
 import { useCursorPos } from '../stores/cursorPos';
+import { effectiveLanguageId, languageLabel } from '../lib/language';
 
 function encodingLabel(e: Encoding): string {
   switch (e) {
@@ -18,16 +20,6 @@ function eolLabel(e: LineEnding): string {
   return e.toUpperCase();
 }
 
-function languageLabel(path: string | null): string {
-  if (!path) return 'Plain';
-  const ext = path.toLowerCase().split('.').pop() ?? '';
-  const map: Record<string, string> = {
-    rs: 'Rust', js: 'JavaScript', jsx: 'JSX', ts: 'TypeScript', tsx: 'TSX',
-    json: 'JSON', md: 'Markdown', markdown: 'Markdown',
-  };
-  return map[ext] ?? 'Plain';
-}
-
 export function StatusBar() {
   const active = useBuffers(selectFocused);
   const setActiveEncoding = useBuffers((s) => s.setActiveEncoding);
@@ -39,6 +31,18 @@ export function StatusBar() {
 
   const [encRect, setEncRect] = useState<DOMRect | null>(null);
   const [eolRect, setEolRect] = useState<DOMRect | null>(null);
+  const [langRect, setLangRect] = useState<DOMRect | null>(null);
+  const langBtnRef = useRef<HTMLButtonElement>(null);
+  const setActiveLanguage = useBuffers((s) => s.setActiveLanguage);
+
+  useEffect(() => {
+    (window as unknown as { __memopadOpenLanguagePicker?: () => void }).__memopadOpenLanguagePicker = () => {
+      if (langBtnRef.current) setLangRect(langBtnRef.current.getBoundingClientRect());
+    };
+    return () => {
+      (window as unknown as { __memopadOpenLanguagePicker?: () => void }).__memopadOpenLanguagePicker = undefined;
+    };
+  }, []);
 
   if (!active) {
     return <div className="h-6 border-t" style={{ borderColor: 'var(--app-border)', background: 'var(--app-bg)' }} />;
@@ -51,7 +55,15 @@ export function StatusBar() {
     >
       <span data-status-segment="cursor">Ln {line}, Col {col}</span>
 
-      <span data-status-segment="language">{languageLabel(active.path)}</span>
+      <button
+        type="button"
+        ref={langBtnRef}
+        data-status-segment="language"
+        onClick={() => { if (langBtnRef.current) setLangRect(langBtnRef.current.getBoundingClientRect()); }}
+        className="hover:text-neutral-100"
+      >
+        {languageLabel(effectiveLanguageId(active))}
+      </button>
 
       <button
         type="button"
@@ -95,6 +107,15 @@ export function StatusBar() {
           anchorRect={eolRect}
           onSelect={setActiveEol}
           onClose={() => setEolRect(null)}
+        />
+      )}
+      {langRect && (
+        <LanguagePopover
+          currentEffectiveId={effectiveLanguageId(active)}
+          hasOverride={active.languageId != null}
+          anchorRect={langRect}
+          onSelect={setActiveLanguage}
+          onClose={() => setLangRect(null)}
         />
       )}
     </div>

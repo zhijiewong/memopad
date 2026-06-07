@@ -694,3 +694,38 @@ describe('restoreSplitState', () => {
     expect(map.has('ghost')).toBe(false);
   });
 });
+
+describe('buffers store — language override', () => {
+  beforeEach(() => {
+    useBuffers.getState().resetAll();
+  });
+
+  it('new buffers have no language override', () => {
+    useBuffers.getState().newBuffer();
+    expect(useBuffers.getState().buffers[0].languageId ?? null).to.equal(null);
+  });
+
+  it('setActiveLanguage sets the override on the focused buffer', () => {
+    const id = useBuffers.getState().openBuffer({ path: '/a/x.py', content: '', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().setActiveLanguage('javascript');
+    const b = useBuffers.getState().buffers.find((x) => x.id === id)!;
+    expect(b.languageId).to.equal('javascript');
+    expect(b.dirty).to.equal(false); // language override does not dirty the buffer
+  });
+
+  it('setActiveLanguage(null) clears the override', () => {
+    const id = useBuffers.getState().openBuffer({ path: '/a/x.py', content: '', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().setActiveLanguage('javascript');
+    useBuffers.getState().setActiveLanguage(null);
+    const b = useBuffers.getState().buffers.find((x) => x.id === id)!;
+    expect(b.languageId).to.equal(null);
+  });
+
+  it('replaceBuffer (external reload) clears a stale language override', () => {
+    const id = useBuffers.getState().openBuffer({ path: '/a/x.py', content: '', encoding: 'utf-8', eol: 'lf' });
+    useBuffers.getState().setActiveLanguage('javascript');
+    useBuffers.getState().replaceBuffer(id, { path: '/a/x.py', content: 'reloaded', encoding: 'utf-8', eol: 'lf' });
+    const b = useBuffers.getState().buffers.find((x) => x.id === id)!;
+    expect(b.languageId ?? null).to.equal(null);
+  });
+});

@@ -28,6 +28,7 @@ export interface Buffer {
   externalChange: boolean;
   cursor: number | null;
   scrollTop: number | null;
+  languageId?: string | null;
 }
 
 export interface RestoredBufferInput {
@@ -77,6 +78,7 @@ interface BuffersState {
   markSaved: (id: string, newPath: string) => void;
   setActiveEncoding: (enc: Encoding) => void;
   setActiveEol: (eol: LineEnding) => void;
+  setActiveLanguage: (id: string | null) => void;
   reorderBuffer: (id: string, toIndex: number) => void;
   reopenLastClosed: () => string | null;
   recordStat: (id: string, stat: FileStatSnapshot) => void;
@@ -325,6 +327,16 @@ export const useBuffers = create<BuffersState>((set, get) => ({
     });
   },
 
+  setActiveLanguage: (id) => {
+    set((s) => {
+      const fid = selectFocusedId(s);
+      if (fid == null) return s;
+      return {
+        buffers: s.buffers.map((b) => (b.id === fid ? { ...b, languageId: id } : b)),
+      };
+    });
+  },
+
   reorderBuffer: (id, toIndex) => {
     set((s) => {
       const from = s.buffers.findIndex((b) => b.id === id);
@@ -407,6 +419,7 @@ export const useBuffers = create<BuffersState>((set, get) => ({
               externalChange: false,
               cursor: null,
               scrollTop: null,
+              languageId: undefined,
             }
           : b,
       ),
