@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-06-07
+
+### Added
+
+- **Bracket navigation** — **Go to Matching Bracket** (`Ctrl+Shift+\`) jumps the caret
+  between a bracket and its partner; **Select to Matching Bracket** extends the
+  selection to it. Both are in the command palette ("Edit: Go to / Select to Matching
+  Bracket") and are syntax-aware, working across `()`, `[]`, and `{}`.
+
 ## [1.1.0] — 2026-06-07
 
 ### Added

@@ -241,6 +241,17 @@ export function registerBuiltins() {
     shortcut: 'Ctrl+Shift+K',
     run: () => globalThis.__memopadLineCommand?.('delete'),
   });
+  register({
+    id: 'edit.goToMatchingBracket',
+    title: 'Edit: Go to Matching Bracket',
+    shortcut: 'Ctrl+Shift+\\',
+    run: () => globalThis.__memopadBracketCommand?.('goto'),
+  });
+  register({
+    id: 'edit.selectToMatchingBracket',
+    title: 'Edit: Select to Matching Bracket',
+    run: () => globalThis.__memopadBracketCommand?.('select'),
+  });
 
   register({
     id: 'workspace.openFolder',
