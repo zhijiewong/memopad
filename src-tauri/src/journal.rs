@@ -102,7 +102,7 @@ pub fn replay_at(journals_dir: &std::path::Path) -> std::io::Result<Vec<Restored
         Err(e) => return Err(e),
     };
     for entry in read_dir {
-        let entry = entry?;
+        let entry = match entry { Ok(e) => e, Err(_) => continue };
         let path = entry.path();
         if path.extension().and_then(|s| s.to_str()) != Some("jsonl") {
             continue;

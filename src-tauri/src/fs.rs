@@ -327,6 +327,29 @@ mod open_file_tests {
     }
 }
 
+/// Atomically write `bytes` to `target`: write a sibling `.tmp`, fsync, then rename
+/// over the target. Returns an error (never panics) if `target` has no file name.
+pub fn atomic_write(target: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let tmp = {
+        let name = target.file_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "target has no file name")
+        })?;
+        let mut new_name = name.to_os_string();
+        new_name.push(".tmp");
+        let mut t = target.to_path_buf();
+        t.set_file_name(new_name);
+        t
+    };
+    {
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+    }
+    std::fs::rename(&tmp, target)?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn save_file(
     path: String,
@@ -337,32 +360,11 @@ pub fn save_file(
     let _ = eol; // EOL of the file is determined by the bytes in `content` itself;
                  // callers normalize line endings in the buffer before calling.
                  // We accept the parameter for symmetry with `open_file` and future use.
-    use std::io::Write;
 
     let bytes = encode_string(&content, encoding);
     let target = std::path::PathBuf::from(&path);
-    let tmp = {
-        let mut t = target.clone();
-        let mut new_name = target
-            .file_name()
-            .ok_or_else(|| format!("invalid path: {}", path))?
-            .to_os_string();
-        new_name.push(".tmp");
-        t.set_file_name(new_name);
-        t
-    };
-
-    {
-        let mut f = std::fs::File::create(&tmp)
-            .map_err(|e| format!("create tmp {}: {}", tmp.display(), e))?;
-        f.write_all(&bytes)
-            .map_err(|e| format!("write tmp: {}", e))?;
-        f.sync_all()
-            .map_err(|e| format!("fsync tmp: {}", e))?;
-    }
-
-    std::fs::rename(&tmp, &target)
-        .map_err(|e| format!("rename {} -> {}: {}", tmp.display(), target.display(), e))?;
+    atomic_write(&target, &bytes)
+        .map_err(|e| format!("atomic write {}: {}", target.display(), e))?;
     Ok(())
 }
 
@@ -409,7 +411,11 @@ mod save_file_tests {
     #[test]
     fn save_does_not_leave_tmp_file_behind() {
         let path = tmp_path("out_clean.txt");
-        let tmp = path.with_extension("txt.tmp");
+        let tmp = {
+            let mut name = path.file_name().unwrap().to_os_string();
+            name.push(".tmp");
+            path.with_file_name(name)
+        };
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(&tmp);
         save_file(
@@ -435,6 +441,24 @@ mod save_file_tests {
         )
         .unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), b"new");
+    }
+}
+
+#[cfg(test)]
+mod atomic_write_tests {
+    use super::*;
+
+    #[test]
+    fn atomic_write_creates_and_overwrites() {
+        let dir = std::env::temp_dir().join(format!("memopad_aw_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("file.txt");
+        atomic_write(&target, b"hello").unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"hello");
+        atomic_write(&target, b"world!").unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"world!");
+        assert!(!dir.join("file.txt.tmp").exists());
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
 
