@@ -70,15 +70,16 @@ overwrite); existing save/replace tests guard the call sites.*
 
 ### Frontend (TypeScript / React — `src`)
 
-**F1. Wire `session-debounce.ts` into window-session saves** (`App.tsx:36,107`)
-`persistWindow` calls `sessionSaveWindow(...)` directly inside the `useBuffers`
-subscribe callback, firing an IPC + disk write on *every* buffers store change
-(i.e. every keystroke). A tested `session-debounce.ts` (`scheduleSessionSave` /
-`flushSessionSave`, mirroring the already-wired `journal-debounce.ts`) exists but is
-unused. Route window-session saves through `scheduleSessionSave`, and call
-`flushSessionSave` on the window-close / unload path so the final state is never
-lost. *Extend `session-debounce.test.ts` only if wiring reveals a gap; the module is
-already tested.*
+**F1. Delete the dead `session-debounce.ts` module** (`src/lib/session-debounce.ts`)
+The module (`scheduleSessionSave` / `flushSessionSave`) is never imported in
+production. The obvious "improvement" — routing `persistWindow` through it — was
+considered and **rejected**: `App.tsx:142–147` documents that the synchronous
+every-change `sessionSaveWindow` is load-bearing, because it guarantees
+`session.json` is current at window-close time *without* an `onCloseRequested`
+handler (which interferes with the Tauri 2 / WebView2 close path). Debouncing would
+reintroduce a close-time staleness window. So the correct action is to delete the
+unused module and its test (`session-debounce.test.ts`) per YAGNI, leaving the
+synchronous save as-is. *No behavior change; removing dead code only.*
 
 **F2. Remove dead `__memopadShowFilesPanel` + add effect cleanup** (`Sidebar.tsx:18–28`)
 `__memopadShowFilesPanel` is registered but has zero callers. Remove it. The effect
