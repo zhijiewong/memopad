@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-06-08
+
+### Fixed
+
+- **Folder-move errors** now read "Cannot move a folder into itself or its own
+  subfolder" instead of a generic "Invalid name".
+- **Crash recovery** is more robust — a single unreadable journal file no longer aborts
+  the entire session replay on startup.
+- **Encoding** and **line-ending** status-bar pickers now dismiss on `Esc`, matching the
+  language and context-menu popovers.
+
+### Changed
+
+- Internal hardening with no user-facing behavior change: removed panic-prone error
+  handling in folder search, extracted a shared atomic file-write helper used by save and
+  replace-in-files, and renamed the shared context-menu component (it serves both the tab
+  strip and the file tree).
+
 ## [1.2.0] — 2026-06-07
 
 ### Added

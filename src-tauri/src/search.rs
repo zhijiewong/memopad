@@ -144,21 +144,7 @@ pub fn replace_in_files(
         let new_text = re.replace_all(&text, replacement).into_owned();
 
         let new_bytes = crate::fs::encode_string(&new_text, encoding);
-        let tmp_path = {
-            let mut t = path.clone();
-            let mut new_name = t.file_name().unwrap_or_default().to_os_string();
-            new_name.push(".tmp");
-            t.set_file_name(new_name);
-            t
-        };
-        let write_result = (|| -> std::io::Result<()> {
-            use std::io::Write;
-            let mut f = std::fs::File::create(&tmp_path)?;
-            f.write_all(&new_bytes)?;
-            f.sync_all()?;
-            std::fs::rename(&tmp_path, &path)?;
-            Ok(())
-        })();
+        let write_result = crate::fs::atomic_write(&path, &new_bytes);
 
         match write_result {
             Ok(()) => {
@@ -184,7 +170,7 @@ pub fn find_in_folder(
     query: &str,
     opts: &FindOptions,
 ) -> Result<FindResponse, FindError> {
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use grep_regex::RegexMatcherBuilder;
@@ -198,8 +184,7 @@ pub fn find_in_folder(
 
     let started = std::time::Instant::now();
 
-    let pattern = if opts.regex { query.to_string() } else { regex::escape(query) };
-    let pattern = if opts.whole_word { format!(r"\b(?:{})\b", pattern) } else { pattern };
+    let pattern = build_matcher_pattern(query, opts);
 
     let matcher = RegexMatcherBuilder::new()
         .case_insensitive(!opts.case_sensitive)
@@ -207,7 +192,7 @@ pub fn find_in_folder(
         .map_err(|e| FindError::InvalidRegex(e.to_string()))?;
 
     let total = Arc::new(AtomicUsize::new(0));
-    let files: Arc<Mutex<Vec<FileMatch>>> = Arc::new(Mutex::new(Vec::new()));
+    let mut files: Vec<FileMatch> = Vec::new();
 
     struct CollectSink<'a> {
         matcher: &'a grep_regex::RegexMatcher,
@@ -265,11 +250,10 @@ pub fn find_in_folder(
             continue;
         }
         if !sink.matches.is_empty() {
-            files.lock().unwrap().push(FileMatch { path: sink.path, matches: sink.matches });
+            files.push(FileMatch { path: sink.path, matches: sink.matches });
         }
     }
 
-    let mut files = Arc::try_unwrap(files).unwrap().into_inner().unwrap();
     files.sort_by(|a, b| a.path.cmp(&b.path));
 
     Ok(FindResponse {

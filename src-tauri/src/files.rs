@@ -48,6 +48,7 @@ pub enum FilesError {
     NotADirectory,
     AlreadyExists,
     InvalidName,
+    Cycle,
     Trash(String),
     Io(std::io::Error),
 }
@@ -59,6 +60,7 @@ impl std::fmt::Display for FilesError {
             FilesError::NotADirectory => write!(f, "Path is not a directory"),
             FilesError::AlreadyExists => write!(f, "A file or folder with that name already exists"),
             FilesError::InvalidName => write!(f, "Invalid name"),
+            FilesError::Cycle => write!(f, "Cannot move a folder into itself or its own subfolder"),
             FilesError::Trash(m) => write!(f, "Could not move to Recycle Bin: {}", m),
             FilesError::Io(e) => write!(f, "{}", e),
         }
@@ -203,7 +205,7 @@ pub fn move_entry(workspace: &Path, src: &Path, dest_dir: &Path) -> Result<Strin
     }
     // Reject moving a directory into itself or one of its own descendants.
     if dest_canon == src_canon || dest_canon.starts_with(&src_canon) {
-        return Err(FilesError::InvalidName);
+        return Err(FilesError::Cycle);
     }
     let name = src_canon.file_name().ok_or(FilesError::PathMissing)?;
     let target = dest_canon.join(name);
@@ -568,7 +570,7 @@ mod tests {
         let ws = tmp("mv_self");
         std::fs::create_dir_all(ws.join("d")).unwrap();
         let err = move_entry(&ws, &ws.join("d"), &ws.join("d")).unwrap_err();
-        matches!(err, FilesError::InvalidName).then_some(()).unwrap();
+        matches!(err, FilesError::Cycle).then_some(()).unwrap();
     }
 
     #[test]
@@ -576,7 +578,7 @@ mod tests {
         let ws = tmp("mv_desc");
         std::fs::create_dir_all(ws.join("d/child")).unwrap();
         let err = move_entry(&ws, &ws.join("d"), &ws.join("d/child")).unwrap_err();
-        matches!(err, FilesError::InvalidName).then_some(()).unwrap();
+        matches!(err, FilesError::Cycle).then_some(()).unwrap();
     }
 
     #[test]
