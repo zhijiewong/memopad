@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useBuffers, selectFocusedId } from '../stores/buffers';
-import { TabContextMenu } from './TabContextMenu';
+import { ContextMenu } from './ContextMenu';
 import { revealInExplorer } from '../lib/tauri';
 
 function fileNameOf(path: string | null, untitledIndex: number): string {
@@ -114,7 +114,7 @@ export function TabStrip() {
       </div>
 
       {ctx && ctxBuffer && (
-        <TabContextMenu
+        <ContextMenu
           x={ctx.x}
           y={ctx.y}
           items={[

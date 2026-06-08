@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useWorkspace } from '../stores/workspace';
 import { useBuffers } from '../stores/buffers';
 import { openFile as openFileIpc, type DirEntry, revealInExplorer } from '../lib/tauri';
-import { TabContextMenu, type TabContextMenuItem } from './TabContextMenu';
+import { ContextMenu, type ContextMenuItem } from './ContextMenu';
 import { InlineEditRow } from './InlineEditRow';
 import { relativeToWorkspace, isInvalidMove } from '../lib/path';
 
@@ -55,9 +55,9 @@ export function TreeNode({ entry, depth }: Props) {
     setEditState({ mode: 'create', parent: entry.path, isDir });
   }
 
-  function buildMenuItems(): TabContextMenuItem[] {
+  function buildMenuItems(): ContextMenuItem[] {
     const workspaceFolder = useWorkspace.getState().workspaceFolder ?? '';
-    const items: TabContextMenuItem[] = [];
+    const items: ContextMenuItem[] = [];
     if (entry.is_dir) {
       items.push({ label: 'New File', enabled: true, onClick: () => { void beginCreate(false); } });
       items.push({ label: 'New Folder', enabled: true, onClick: () => { void beginCreate(true); } });
@@ -168,7 +168,7 @@ export function TreeNode({ entry, depth }: Props) {
         </>
       )}
       {menuPos && (
-        <TabContextMenu
+        <ContextMenu
           x={menuPos.x}
           y={menuPos.y}
           items={buildMenuItems()}

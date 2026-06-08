@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export interface TabContextMenuItem {
+export interface ContextMenuItem {
   label: string;
   enabled: boolean;
   onClick: () => void;
@@ -9,11 +9,11 @@ export interface TabContextMenuItem {
 interface Props {
   x: number;
   y: number;
-  items: TabContextMenuItem[];
+  items: ContextMenuItem[];
   onClose: () => void;
 }
 
-export function TabContextMenu({ x, y, items, onClose }: Props) {
+export function ContextMenu({ x, y, items, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
