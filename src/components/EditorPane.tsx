@@ -358,7 +358,7 @@ export function EditorPane(props: EditorPaneProps) {
             }
             if (buffer && scrollTop != null) {
               requestAnimationFrame(() => {
-                view.scrollDOM.scrollTop = scrollTop ?? 0;
+                view.scrollDOM.scrollTop = scrollTop;
               });
             }
           }}

@@ -189,7 +189,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onKey = async (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       // Alt+Z toggles word wrap (no Ctrl/Meta — handle before the mod guard).
       if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'z') {

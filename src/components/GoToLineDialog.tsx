@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBuffers, selectFocused } from '../stores/buffers';
 import { useCursorPos } from '../stores/cursorPos';
 import { parseGotoLine } from '../lib/cursor';
@@ -10,7 +10,10 @@ interface Props {
 export function GoToLineDialog({ onClose }: Props) {
   const focused = useBuffers(selectFocused);
   const currentLine = useCursorPos((s) => s.line);
-  const totalLines = focused ? focused.content.split('\n').length : 1;
+  const totalLines = useMemo(
+    () => (focused ? focused.content.split('\n').length : 1),
+    [focused?.content],
+  );
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(String(currentLine));
