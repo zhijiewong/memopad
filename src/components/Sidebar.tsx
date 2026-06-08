@@ -19,6 +19,7 @@ export function Sidebar({ open, onOpenFolder }: Props) {
     const w = window as unknown as {
       __memopadToggleSidebarTab?: () => void;
       __memopadShowSearchPanel?: () => void;
+      __memopadShowFilesPanel?: () => void;
     };
     w.__memopadToggleSidebarTab = () => {
       setActiveTab((t) => (t === 'files' ? 'search' : 'files'));
@@ -26,9 +27,15 @@ export function Sidebar({ open, onOpenFolder }: Props) {
     w.__memopadShowSearchPanel = () => {
       setActiveTab('search');
     };
+    // No production caller, but the e2e specs use this to force the files tab
+    // for sidebar isolation between suites — keep it (symmetric with above).
+    w.__memopadShowFilesPanel = () => {
+      setActiveTab('files');
+    };
     return () => {
       w.__memopadToggleSidebarTab = undefined;
       w.__memopadShowSearchPanel = undefined;
+      w.__memopadShowFilesPanel = undefined;
     };
   }, []);
 
