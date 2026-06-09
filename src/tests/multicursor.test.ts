@@ -13,14 +13,14 @@ function stateWith(doc: string, sel: EditorSelection): EditorState {
 describe('addCursorVertical', () => {
   it('adds a cursor on the line below at the same column', () => {
     // "abc\ndef": cursor at col 2 on line 1 (pos 2)
-    const s = stateWith('abc\ndef', EditorSelection.cursor(2));
+    const s = stateWith('abc\ndef', EditorSelection.create([EditorSelection.cursor(2)]));
     const sel = addCursorVertical(s, 1);
     expect(sel.ranges.map((r) => r.head)).toEqual([2, 6]); // line2 from=4, +2
     expect(sel.main.head).toBe(6); // newest cursor is primary
   });
 
   it('adds a cursor on the line above at the same column', () => {
-    const s = stateWith('abc\ndef', EditorSelection.cursor(6)); // line2 col2
+    const s = stateWith('abc\ndef', EditorSelection.create([EditorSelection.cursor(6)])); // line2 col2
     const sel = addCursorVertical(s, -1);
     expect(sel.ranges.map((r) => r.head)).toEqual([2, 6]);
     expect(sel.main.head).toBe(2);
@@ -28,7 +28,7 @@ describe('addCursorVertical', () => {
 
   it('clamps the column to a shorter target line', () => {
     // "abcde\nxy": cursor at col 4 (pos 4) on line1; line2 length 2
-    const s = stateWith('abcde\nxy', EditorSelection.cursor(4));
+    const s = stateWith('abcde\nxy', EditorSelection.create([EditorSelection.cursor(4)]));
     const sel = addCursorVertical(s, 1);
     // line2 from=6, min(4,2)=2 => 8
     expect(sel.ranges.map((r) => r.head)).toEqual([4, 8]);
@@ -46,7 +46,7 @@ describe('addCursorVertical', () => {
   });
 
   it('returns the same selection unchanged at the document boundary', () => {
-    const s = stateWith('abc\ndef', EditorSelection.cursor(1)); // line1
+    const s = stateWith('abc\ndef', EditorSelection.create([EditorSelection.cursor(1)])); // line1
     const sel = addCursorVertical(s, -1); // nothing above line 1
     expect(sel).toBe(s.selection);
   });
