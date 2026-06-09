@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
-import { EditorView, keymap } from '@codemirror/view';
+import { EditorView, keymap, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import {
   SearchQuery,
   setSearchQuery as cmSetSearchQuery,
@@ -19,6 +19,7 @@ import { useEditorPrefs } from '../stores/editorPrefs';
 import { useBuffers, selectPaneState } from '../stores/buffers';
 import { effectiveLanguageId, languageExtensionsById } from '../lib/language';
 import { matchingBracketTarget } from '../lib/brackets';
+import { addCursorVertical } from '../lib/multicursor';
 import { useTheme, effectiveTheme } from '../stores/theme';
 import { useCursorPos } from '../stores/cursorPos';
 import { memopadDark } from '../editor/memopad-dark';
@@ -55,6 +56,8 @@ declare global {
   var __memopadLineCommand: ((cmd: 'moveUp' | 'moveDown' | 'duplicate' | 'delete') => void) | undefined;
   // eslint-disable-next-line no-var
   var __memopadBracketCommand: ((cmd: 'goto' | 'select') => void) | undefined;
+  // eslint-disable-next-line no-var
+  var __memopadMultiCursorCommand: ((dir: 'above' | 'below') => void) | undefined;
 }
 
 function goToMatchingBracket(view: EditorView): boolean {
@@ -76,6 +79,20 @@ function selectToMatchingBracket(view: EditorView): boolean {
     selection: { anchor, head: target },
     effects: EditorView.scrollIntoView(target),
   });
+  return true;
+}
+
+function addCursorAbove(view: EditorView): boolean {
+  const selection = addCursorVertical(view.state, -1);
+  if (selection === view.state.selection) return false;
+  view.dispatch({ selection, scrollIntoView: true });
+  return true;
+}
+
+function addCursorBelow(view: EditorView): boolean {
+  const selection = addCursorVertical(view.state, 1);
+  if (selection === view.state.selection) return false;
+  view.dispatch({ selection, scrollIntoView: true });
   return true;
 }
 
@@ -221,7 +238,11 @@ export function EditorPane(props: EditorPaneProps) {
     }
     const head = v.state.selection.main.head;
     const headLine = v.state.doc.lineAt(head);
-    useCursorPos.getState().set(headLine.number, head - headLine.from + 1);
+    useCursorPos.getState().set(
+      headLine.number,
+      head - headLine.from + 1,
+      v.state.selection.ranges.length,
+    );
   }, [props.focused, props.bufferId]);
 
   // Register window globals gated on focused.
@@ -277,11 +298,18 @@ export function EditorPane(props: EditorPaneProps) {
       (cmd === 'select' ? selectToMatchingBracket : goToMatchingBracket)(v);
       v.focus();
     };
+    globalThis.__memopadMultiCursorCommand = (dir) => {
+      const v = viewRef.current;
+      if (!v) return;
+      (dir === 'above' ? addCursorAbove : addCursorBelow)(v);
+      v.focus();
+    };
     return () => {
       globalThis.__memopadSearchPanel = undefined;
       globalThis.__memopadGotoLine = undefined;
       globalThis.__memopadLineCommand = undefined;
       globalThis.__memopadBracketCommand = undefined;
+      globalThis.__memopadMultiCursorCommand = undefined;
     };
   }, [props.focused]);
 
@@ -335,9 +363,13 @@ export function EditorPane(props: EditorPaneProps) {
             editorTheme,
             themeExt,
             search(),
+            rectangularSelection(),
+            crosshairCursor(),
             Prec.high(keymap.of([
               { key: 'Mod-d', run: copyLineDown, preventDefault: true },
               { key: 'Mod-Shift-\\', run: goToMatchingBracket, preventDefault: true },
+              { key: 'Mod-Alt-ArrowUp', run: addCursorAbove, preventDefault: true },
+              { key: 'Mod-Alt-ArrowDown', run: addCursorBelow, preventDefault: true },
             ])),
             ...(wordWrap ? [EditorView.lineWrapping] : []),
             ...(indentGuides ? [indentationMarkers()] : []),
@@ -369,11 +401,17 @@ export function EditorPane(props: EditorPaneProps) {
             persistCursor(head, scrollTop);
             if (props.focused) {
               const headLine = viewUpdate.state.doc.lineAt(head);
-              useCursorPos.getState().set(headLine.number, head - headLine.from + 1);
+              useCursorPos.getState().set(
+                headLine.number,
+                head - headLine.from + 1,
+                viewUpdate.state.selection.ranges.length,
+              );
             }
           }}
           basicSetup={{
             lineNumbers: true,
+            drawSelection: true,
+            allowMultipleSelections: true,
             foldGutter: false,
             highlightActiveLine: true,
             bracketMatching: true,

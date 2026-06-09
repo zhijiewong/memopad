@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-06-09
+
+### Added
+
+- **Column / multi-cursor editing** — hold **Alt and drag** to make a rectangular
+  (column) selection, then type to edit every row at once. Add stacked cursors from the
+  keyboard with **Ctrl+Alt+↑ / Ctrl+Alt+↓** (also in the command palette as **Edit: Add
+  Cursor Above / Below**), and press **Esc** to collapse back to a single cursor. The
+  status bar shows the active cursor count (e.g. "3 cursors") while more than one is live.
+
 ## [1.2.1] — 2026-06-08
 
 ### Fixed

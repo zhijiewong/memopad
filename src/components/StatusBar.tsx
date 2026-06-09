@@ -28,6 +28,7 @@ export function StatusBar() {
   const toggleWordWrap = useEditorPrefs((s) => s.toggleWordWrap);
   const line = useCursorPos((s) => s.line);
   const col = useCursorPos((s) => s.col);
+  const cursorCount = useCursorPos((s) => s.cursorCount);
 
   const [encRect, setEncRect] = useState<DOMRect | null>(null);
   const [eolRect, setEolRect] = useState<DOMRect | null>(null);
@@ -54,6 +55,9 @@ export function StatusBar() {
       style={{ borderColor: 'var(--app-border)', background: 'var(--app-bg)', color: 'var(--app-fg-muted)' }}
     >
       <span data-status-segment="cursor">Ln {line}, Col {col}</span>
+      {cursorCount > 1 && (
+        <span data-status-segment="cursors">{cursorCount} cursors</span>
+      )}
 
       <button
         type="button"

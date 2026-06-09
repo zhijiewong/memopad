@@ -242,6 +242,18 @@ export function registerBuiltins() {
     run: () => globalThis.__memopadLineCommand?.('delete'),
   });
   register({
+    id: 'edit.addCursorAbove',
+    title: 'Edit: Add Cursor Above',
+    shortcut: 'Ctrl+Alt+Up',
+    run: () => globalThis.__memopadMultiCursorCommand?.('above'),
+  });
+  register({
+    id: 'edit.addCursorBelow',
+    title: 'Edit: Add Cursor Below',
+    shortcut: 'Ctrl+Alt+Down',
+    run: () => globalThis.__memopadMultiCursorCommand?.('below'),
+  });
+  register({
     id: 'edit.goToMatchingBracket',
     title: 'Edit: Go to Matching Bracket',
     shortcut: 'Ctrl+Shift+\\',
