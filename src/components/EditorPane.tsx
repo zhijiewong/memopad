@@ -238,7 +238,11 @@ export function EditorPane(props: EditorPaneProps) {
     }
     const head = v.state.selection.main.head;
     const headLine = v.state.doc.lineAt(head);
-    useCursorPos.getState().set(headLine.number, head - headLine.from + 1);
+    useCursorPos.getState().set(
+      headLine.number,
+      head - headLine.from + 1,
+      v.state.selection.ranges.length,
+    );
   }, [props.focused, props.bufferId]);
 
   // Register window globals gated on focused.
