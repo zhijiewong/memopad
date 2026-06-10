@@ -106,4 +106,9 @@ describe('editor prefs session restore', () => {
     applyEditorPrefsFromSession({ minimap: true });
     expect(useEditorPrefs.getState().minimap).toBe(true);
   });
+
+  it('applies code_folding from session', () => {
+    applyEditorPrefsFromSession({ code_folding: false });
+    expect(useEditorPrefs.getState().codeFolding).toBe(false);
+  });
 });

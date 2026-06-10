@@ -42,6 +42,7 @@ function persistApp() {
       word_wrap: useEditorPrefs.getState().wordWrap,
       indent_guides: useEditorPrefs.getState().indentGuides,
       minimap: useEditorPrefs.getState().minimap,
+      code_folding: useEditorPrefs.getState().codeFolding,
     },
     useWorkspace.getState().recentFolders,
     useRecentFiles.getState().recentFiles,
