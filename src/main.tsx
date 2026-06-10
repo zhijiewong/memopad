@@ -44,6 +44,7 @@ const w = window as unknown as {
   __memopadTestResetEditorPrefs?: () => void;
   __memopadTestCursorPos?: () => { line: number; col: number };
   __memopadTestSelectionCount?: () => number;
+  __memopadTestFoldedCount?: () => number;
   __memopadTestRecentFiles?: () => string[];
   __memopadTestResetRecentFiles?: () => void;
   __memopadTestSetLanguage?: (id: string | null) => void;
@@ -84,6 +85,7 @@ w.__memopadTestCursorPos = () => ({
   col: useCursorPos.getState().col,
 });
 w.__memopadTestSelectionCount = () => useCursorPos.getState().cursorCount;
+w.__memopadTestFoldedCount = () => globalThis.__memopadFoldedCount?.() ?? 0;
 w.__memopadTestRecentFiles = () => useRecentFiles.getState().recentFiles;
 w.__memopadTestResetRecentFiles = () => useRecentFiles.getState().clear();
 w.__memopadTestSetLanguage = (id) => useBuffers.getState().setActiveLanguage(id);
