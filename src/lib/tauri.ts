@@ -64,6 +64,7 @@ export interface EditorPrefsWire {
   word_wrap?: boolean | null;
   indent_guides?: boolean | null;
   minimap?: boolean | null;
+  code_folding?: boolean | null;
 }
 
 export interface WindowSession {

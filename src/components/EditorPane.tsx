@@ -13,6 +13,7 @@ import {
 } from '@codemirror/search';
 import { Prec } from '@codemirror/state';
 import { moveLineUp, moveLineDown, copyLineDown, deleteLine } from '@codemirror/commands';
+import { foldAll, unfoldAll, foldedRanges } from '@codemirror/language';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import { showMinimap } from '@replit/codemirror-minimap';
 import { useEditorPrefs } from '../stores/editorPrefs';
@@ -58,6 +59,10 @@ declare global {
   var __memopadBracketCommand: ((cmd: 'goto' | 'select') => void) | undefined;
   // eslint-disable-next-line no-var
   var __memopadMultiCursorCommand: ((dir: 'above' | 'below') => void) | undefined;
+  // eslint-disable-next-line no-var
+  var __memopadFoldCommand: ((cmd: 'foldAll' | 'unfoldAll') => void) | undefined;
+  // eslint-disable-next-line no-var
+  var __memopadFoldedCount: (() => number) | undefined;
 }
 
 function goToMatchingBracket(view: EditorView): boolean {
@@ -123,6 +128,7 @@ export function EditorPane(props: EditorPaneProps) {
   const wordWrap = useEditorPrefs((s) => s.wordWrap);
   const indentGuides = useEditorPrefs((s) => s.indentGuides);
   const minimap = useEditorPrefs((s) => s.minimap);
+  const codeFolding = useEditorPrefs((s) => s.codeFolding);
 
   const viewRef = useRef<EditorView | null>(null);
 
@@ -304,14 +310,36 @@ export function EditorPane(props: EditorPaneProps) {
       (dir === 'above' ? addCursorAbove : addCursorBelow)(v);
       v.focus();
     };
+    globalThis.__memopadFoldCommand = (cmd) => {
+      const v = viewRef.current;
+      if (!v) return;
+      (cmd === 'foldAll' ? foldAll : unfoldAll)(v);
+      v.focus();
+    };
+    globalThis.__memopadFoldedCount = () => {
+      const v = viewRef.current;
+      if (!v) return 0;
+      let n = 0;
+      foldedRanges(v.state).between(0, v.state.doc.length, () => { n += 1; });
+      return n;
+    };
     return () => {
       globalThis.__memopadSearchPanel = undefined;
       globalThis.__memopadGotoLine = undefined;
       globalThis.__memopadLineCommand = undefined;
       globalThis.__memopadBracketCommand = undefined;
       globalThis.__memopadMultiCursorCommand = undefined;
+      globalThis.__memopadFoldCommand = undefined;
+      globalThis.__memopadFoldedCount = undefined;
     };
   }, [props.focused]);
+
+  // When folding is switched off, the gutter and fold keys disappear; any folded
+  // region would remain invisibly collapsed with no UI to restore it. Unfold this
+  // pane's view first (each pane handles itself, so split view is covered).
+  useEffect(() => {
+    if (!codeFolding && viewRef.current) unfoldAll(viewRef.current);
+  }, [codeFolding]);
 
   useEffect(() => {
     return () => {
@@ -412,7 +440,8 @@ export function EditorPane(props: EditorPaneProps) {
             lineNumbers: true,
             drawSelection: true,
             allowMultipleSelections: true,
-            foldGutter: false,
+            foldGutter: codeFolding,
+            foldKeymap: codeFolding,
             highlightActiveLine: true,
             bracketMatching: true,
             closeBrackets: true,

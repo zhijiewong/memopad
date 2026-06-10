@@ -40,10 +40,11 @@ const w = window as unknown as {
     secondaryId: string | null;
     focusedPane: 'primary' | 'secondary';
   };
-  __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean; minimap: boolean };
+  __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean; minimap: boolean; codeFolding: boolean };
   __memopadTestResetEditorPrefs?: () => void;
   __memopadTestCursorPos?: () => { line: number; col: number };
   __memopadTestSelectionCount?: () => number;
+  __memopadTestFoldedCount?: () => number;
   __memopadTestRecentFiles?: () => string[];
   __memopadTestResetRecentFiles?: () => void;
   __memopadTestSetLanguage?: (id: string | null) => void;
@@ -76,6 +77,7 @@ w.__memopadTestEditorPrefs = () => ({
   wordWrap: useEditorPrefs.getState().wordWrap,
   indentGuides: useEditorPrefs.getState().indentGuides,
   minimap: useEditorPrefs.getState().minimap,
+  codeFolding: useEditorPrefs.getState().codeFolding,
 });
 w.__memopadTestResetEditorPrefs = () => useEditorPrefs.getState().reset();
 w.__memopadTestCommandIds = () => useCommands.getState().commands.map((c) => c.id);
@@ -84,6 +86,7 @@ w.__memopadTestCursorPos = () => ({
   col: useCursorPos.getState().col,
 });
 w.__memopadTestSelectionCount = () => useCursorPos.getState().cursorCount;
+w.__memopadTestFoldedCount = () => globalThis.__memopadFoldedCount?.() ?? 0;
 w.__memopadTestRecentFiles = () => useRecentFiles.getState().recentFiles;
 w.__memopadTestResetRecentFiles = () => useRecentFiles.getState().clear();
 w.__memopadTestSetLanguage = (id) => useBuffers.getState().setActiveLanguage(id);

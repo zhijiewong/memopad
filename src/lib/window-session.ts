@@ -32,5 +32,6 @@ export function applyAppGlobal(app: AppSession): void {
   if (prefs.word_wrap != null) useEditorPrefs.getState().setWordWrap(prefs.word_wrap);
   if (prefs.indent_guides != null) useEditorPrefs.getState().setIndentGuides(prefs.indent_guides);
   if (prefs.minimap != null) useEditorPrefs.getState().setMinimap(prefs.minimap);
+  if (prefs.code_folding != null) useEditorPrefs.getState().setCodeFolding(prefs.code_folding);
   useRecentFiles.getState().setRecent(app.recent_files ?? []);
 }

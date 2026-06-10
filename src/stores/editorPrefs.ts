@@ -7,16 +7,20 @@ interface EditorPrefsState {
   indentGuides: boolean;
   /** Show the code-overview minimap. Default off. */
   minimap: boolean;
+  /** Show the fold gutter + enable fold keybindings. Default on. */
+  codeFolding: boolean;
   toggleMinimap: () => void;
   setMinimap: (v: boolean) => void;
   toggleWordWrap: () => void;
   toggleIndentGuides: () => void;
   setWordWrap: (v: boolean) => void;
   setIndentGuides: (v: boolean) => void;
+  toggleCodeFolding: () => void;
+  setCodeFolding: (v: boolean) => void;
   reset: () => void;
 }
 
-const DEFAULTS = { wordWrap: false, indentGuides: true, minimap: false };
+const DEFAULTS = { wordWrap: false, indentGuides: true, minimap: false, codeFolding: true };
 
 export const useEditorPrefs = create<EditorPrefsState>((set) => ({
   ...DEFAULTS,
@@ -26,5 +30,7 @@ export const useEditorPrefs = create<EditorPrefsState>((set) => ({
   setMinimap: (v) => set({ minimap: v }),
   setWordWrap: (v) => set({ wordWrap: v }),
   setIndentGuides: (v) => set({ indentGuides: v }),
+  toggleCodeFolding: () => set((s) => ({ codeFolding: !s.codeFolding })),
+  setCodeFolding: (v) => set({ codeFolding: v }),
   reset: () => set({ ...DEFAULTS }),
 }));

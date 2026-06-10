@@ -85,6 +85,8 @@ pub struct EditorPrefs {
     pub indent_guides: Option<bool>,
     #[serde(default)]
     pub minimap: Option<bool>,
+    #[serde(default)]
+    pub code_folding: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -143,6 +145,7 @@ pub fn parse_app_session(raw: &str) -> AppSession {
                 word_wrap: l.word_wrap,
                 indent_guides: l.indent_guides,
                 minimap: l.minimap,
+                code_folding: None,
             },
             recent_folders: l.recent_folders,
             recent_files: l.recent_files,
@@ -420,6 +423,20 @@ mod tests {
         let json = r#"{ "tabs": [], "active_id": null }"#;
         let s: LegacySession = serde_json::from_str(json).unwrap();
         assert_eq!(s.minimap, None);
+    }
+
+    #[test]
+    fn editor_prefs_default_code_folding_when_absent() {
+        let p: EditorPrefs = serde_json::from_str("{}").unwrap();
+        assert_eq!(p.code_folding, None);
+    }
+
+    #[test]
+    fn editor_prefs_roundtrips_code_folding() {
+        let p = EditorPrefs { code_folding: Some(false), ..Default::default() };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: EditorPrefs = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.code_folding, Some(false));
     }
 
     #[test]

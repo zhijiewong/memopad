@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-06-10
+
+### Added
+
+- **Code folding** — foldable blocks get arrows in the gutter; click to collapse a
+  block to "…" and click the placeholder to expand it. **Ctrl+Shift+[ / ]** fold and
+  unfold the current block; **Ctrl+Alt+[ / ]** (also in the palette as **View: Fold
+  All / Unfold All**) fold and unfold everything. Folding is on by default and can be
+  switched off with **View: Toggle Code Folding** (persisted, like word wrap and the
+  minimap); turning it off automatically unfolds everything first.
+
 ## [1.3.0] — 2026-06-09
 
 ### Added

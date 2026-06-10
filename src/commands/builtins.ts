@@ -193,6 +193,23 @@ export function registerBuiltins() {
     run: () => useEditorPrefs.getState().toggleMinimap(),
   });
   register({
+    id: 'view.toggleCodeFolding',
+    title: 'View: Toggle Code Folding',
+    run: () => useEditorPrefs.getState().toggleCodeFolding(),
+  });
+  register({
+    id: 'view.foldAll',
+    title: 'View: Fold All',
+    shortcut: 'Ctrl+Alt+[',
+    run: () => globalThis.__memopadFoldCommand?.('foldAll'),
+  });
+  register({
+    id: 'view.unfoldAll',
+    title: 'View: Unfold All',
+    shortcut: 'Ctrl+Alt+]',
+    run: () => globalThis.__memopadFoldCommand?.('unfoldAll'),
+  });
+  register({
     id: 'view.setLanguage',
     title: 'View: Set Language…',
     run: () => (window as unknown as { __memopadOpenLanguagePicker?: () => void }).__memopadOpenLanguagePicker?.(),
