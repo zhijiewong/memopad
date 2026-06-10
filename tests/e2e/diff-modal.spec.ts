@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { getBrowser, classicExecute } from './support/driver';
+import { pollFor, sleep } from './support/helpers';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -8,8 +9,14 @@ async function exec<T>(fn: () => T): Promise<T> {
   return getBrowser().execute(fn);
 }
 
-async function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+function modalPresent(): Promise<boolean> {
+  return classicExecute<boolean>(`return !!document.querySelector('[data-diff-modal]');`);
+}
+
+function diffRowTypes(): Promise<string[]> {
+  return classicExecute<string[]>(
+    `return Array.from(document.querySelectorAll('[data-diff-row-type]')).map(el => el.getAttribute('data-diff-row-type'));`,
+  );
 }
 
 describe('diff modal', () => {
@@ -39,33 +46,32 @@ describe('diff modal', () => {
       },
       filePath,
     );
-    await sleep(200);
 
-    await classicExecute<void>(
-      `var btns = Array.from(document.querySelectorAll('[data-external-change-banner] button'));
-       var diff = btns.find(b => b.textContent && b.textContent.trim() === 'Diff');
-       if (diff) diff.click();
-       return undefined;`,
+    // Poll until the Diff button has rendered AND the click lands — a blind
+    // `if (btn) btn.click()` silently no-ops if the banner hasn't committed yet.
+    const clicked = await pollFor(() =>
+      classicExecute<boolean>(
+        `var btns = Array.from(document.querySelectorAll('[data-external-change-banner] button'));
+         var diff = btns.find(b => b.textContent && b.textContent.trim() === 'Diff');
+         if (diff) { diff.click(); return true; }
+         return false;`,
+      ),
     );
-    await sleep(700);
+    expect(clicked, 'Diff button should render and be clicked').to.equal(true);
 
-    const modalPresent = await classicExecute<boolean>(
-      `return !!document.querySelector('[data-diff-modal]');`,
-    );
-    expect(modalPresent, 'diff modal must render').to.equal(true);
+    expect(await pollFor(modalPresent), 'diff modal must render').to.equal(true);
 
-    const rowTypes = await classicExecute<string[]>(
-      `return Array.from(document.querySelectorAll('[data-diff-row-type]')).map(el => el.getAttribute('data-diff-row-type'));`,
-    );
-    expect(rowTypes).to.include('add');
-    expect(rowTypes).to.include('del');
+    // The modal shell renders immediately with "Loading…" while openFile() IPC +
+    // lineDiff complete async; a fixed sleep raced that IPC on slow CI runners
+    // (rowTypes came back []). Poll for the rows instead.
+    const rowsReady = await pollFor(async () => {
+      const types = await diffRowTypes();
+      return types.includes('add') && types.includes('del');
+    });
+    expect(rowsReady, 'diff rows should include add and del').to.equal(true);
 
     await getBrowser().keys('Escape');
-    await sleep(200);
-    const stillPresent = await classicExecute<boolean>(
-      `return !!document.querySelector('[data-diff-modal]');`,
-    );
-    expect(stillPresent).to.equal(false);
+    expect(await pollFor(async () => !(await modalPresent())), 'Escape should close the modal').to.equal(true);
 
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
   });

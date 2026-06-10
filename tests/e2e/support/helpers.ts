@@ -6,6 +6,30 @@ import * as crypto from 'node:crypto';
 
 const FIXTURE_SOURCE = path.resolve(__dirname, '..', '..', 'smoke', 'fixtures');
 
+export async function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Poll a condition until it holds or the timeout elapses.
+ * Store updates reach the DOM via async React commits, and several test hooks
+ * fire async IPC; classicExecute (WebDriver /execute/sync) does NOT await
+ * returned promises. Poll for the resulting UI state rather than guessing a
+ * fixed delay — fixed sleeps are exactly what flaked on slow CI runners.
+ */
+export async function pollFor(
+  fn: () => Promise<boolean>,
+  timeoutMs = 6000,
+  stepMs = 150,
+): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await fn()) return true;
+    await sleep(stepMs);
+  }
+  return false;
+}
+
 /**
  * Invoke a Tauri command directly from the WebView context.
  * Bypasses native dialogs that the test runner cannot drive.

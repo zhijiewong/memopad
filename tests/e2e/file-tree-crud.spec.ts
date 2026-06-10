@@ -2,8 +2,7 @@ import { expect } from 'chai';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { getBrowser, classicExecute } from './support/driver';
-
-async function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+import { pollFor, sleep } from './support/helpers';
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'workspace');
 
@@ -13,22 +12,6 @@ function rowHas(text: string): Promise<boolean> {
     `return Array.from(document.querySelectorAll('[data-testid="tree-row"]'))
        .some(r => (r.textContent || '').includes(${JSON.stringify(text)}));`,
   );
-}
-
-/**
- * Poll a condition until it holds or the timeout elapses.
- * The tree CRUD hooks fire async store actions (two IPC round-trips + a React
- * re-render); classicExecute (WebDriver /execute/sync) does NOT await the
- * returned promise, so we poll for the resulting UI state rather than guessing
- * a fixed delay.
- */
-async function pollFor(fn: () => Promise<boolean>, timeoutMs = 6000, stepMs = 200): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (await fn()) return true;
-    await sleep(stepMs);
-  }
-  return false;
 }
 
 describe('file-tree CRUD', () => {
