@@ -69,6 +69,24 @@ describe('useEditorPrefs minimap', () => {
   });
 });
 
+describe('useEditorPrefs codeFolding', () => {
+  beforeEach(() => useEditorPrefs.getState().reset());
+
+  it('defaults codeFolding on', () => {
+    expect(useEditorPrefs.getState().codeFolding).toBe(true);
+  });
+  it('toggleCodeFolding flips it', () => {
+    useEditorPrefs.getState().toggleCodeFolding();
+    expect(useEditorPrefs.getState().codeFolding).toBe(false);
+  });
+  it('setCodeFolding sets it; reset restores default', () => {
+    useEditorPrefs.getState().setCodeFolding(false);
+    expect(useEditorPrefs.getState().codeFolding).toBe(false);
+    useEditorPrefs.getState().reset();
+    expect(useEditorPrefs.getState().codeFolding).toBe(true);
+  });
+});
+
 describe('editor prefs session restore', () => {
   beforeEach(() => useEditorPrefs.getState().reset());
 
