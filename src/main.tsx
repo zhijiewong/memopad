@@ -40,7 +40,7 @@ const w = window as unknown as {
     secondaryId: string | null;
     focusedPane: 'primary' | 'secondary';
   };
-  __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean; minimap: boolean };
+  __memopadTestEditorPrefs?: () => { wordWrap: boolean; indentGuides: boolean; minimap: boolean; codeFolding: boolean };
   __memopadTestResetEditorPrefs?: () => void;
   __memopadTestCursorPos?: () => { line: number; col: number };
   __memopadTestSelectionCount?: () => number;
@@ -77,6 +77,7 @@ w.__memopadTestEditorPrefs = () => ({
   wordWrap: useEditorPrefs.getState().wordWrap,
   indentGuides: useEditorPrefs.getState().indentGuides,
   minimap: useEditorPrefs.getState().minimap,
+  codeFolding: useEditorPrefs.getState().codeFolding,
 });
 w.__memopadTestResetEditorPrefs = () => useEditorPrefs.getState().reset();
 w.__memopadTestCommandIds = () => useCommands.getState().commands.map((c) => c.id);

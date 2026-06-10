@@ -334,6 +334,13 @@ export function EditorPane(props: EditorPaneProps) {
     };
   }, [props.focused]);
 
+  // When folding is switched off, the gutter and fold keys disappear; any folded
+  // region would remain invisibly collapsed with no UI to restore it. Unfold this
+  // pane's view first (each pane handles itself, so split view is covered).
+  useEffect(() => {
+    if (!codeFolding && viewRef.current) unfoldAll(viewRef.current);
+  }, [codeFolding]);
+
   useEffect(() => {
     return () => {
       if (cursorWriteTimer.current) clearTimeout(cursorWriteTimer.current);
