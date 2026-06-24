@@ -1,8 +1,15 @@
 import { expect } from 'chai';
 import { getBrowser, classicExecute } from './support/driver';
+import { pollFor } from './support/helpers';
 
 async function exec<T>(fn: () => T): Promise<T> {
   return getBrowser().execute(fn);
+}
+
+function bannerPresent(): Promise<boolean> {
+  return classicExecute<boolean>(
+    `return !!document.querySelector('[data-external-change-banner]');`,
+  );
 }
 
 describe('external-change banner', () => {
@@ -20,32 +27,23 @@ describe('external-change banner', () => {
       };
       w.__memopadTestOpenBuffer({ path: '/tmp/x.txt', content: 'x', encoding: 'utf-8', eol: 'lf' });
     });
-    const present = await classicExecute<boolean>(
-      `return !!document.querySelector('[data-external-change-banner]');`,
-    );
+    const present = await bannerPresent();
     expect(present).to.equal(false);
   });
 
   it('appears when externalChange is set on the active buffer', async () => {
-    const id = await exec(() => {
-      const w = window as unknown as {
-        __memopadTestOpenBuffer: (f: { path: string; content: string; encoding: string; eol: string }) => string;
-      };
-      return w.__memopadTestOpenBuffer({ path: '/tmp/x.txt', content: 'x', encoding: 'utf-8', eol: 'lf' });
-    });
     await exec(() => {
       const w = window as unknown as {
+        __memopadTestOpenBuffer: (f: { path: string; content: string; encoding: string; eol: string }) => string;
         __memopadTestSetExternalChange: (id: string, flag: boolean) => void;
         __memopadTestActiveId: () => string | null;
       };
+      w.__memopadTestOpenBuffer({ path: '/tmp/x.txt', content: 'x', encoding: 'utf-8', eol: 'lf' });
       const active = w.__memopadTestActiveId();
       if (active) w.__memopadTestSetExternalChange(active, true);
     });
-    const present = await classicExecute<boolean>(
-      `return !!document.querySelector('[data-external-change-banner]');`,
-    );
-    expect(present).to.equal(true);
-    void id;
+    // The store update reaches the DOM via an async React commit — poll, don't assume.
+    expect(await pollFor(bannerPresent), 'banner should appear').to.equal(true);
   });
 
   it('Keep mine clears the externalChange flag', async () => {
@@ -59,16 +57,18 @@ describe('external-change banner', () => {
       const id = w.__memopadTestActiveId();
       if (id) w.__memopadTestSetExternalChange(id, true);
     });
-    await classicExecute<void>(
-      `var btns = Array.from(document.querySelectorAll('[data-external-change-banner] button'));
-       var keep = btns.find(b => b.textContent && b.textContent.trim() === 'Keep mine');
-       if (keep) keep.click();
-       return undefined;`,
+    // Poll until the click actually lands: a blind `if (btn) btn.click()` races
+    // the banner's first render and silently no-ops on slow runners — the exact
+    // flake this spec used to have.
+    const clicked = await pollFor(() =>
+      classicExecute<boolean>(
+        `var btns = Array.from(document.querySelectorAll('[data-external-change-banner] button'));
+         var keep = btns.find(b => b.textContent && b.textContent.trim() === 'Keep mine');
+         if (keep) { keep.click(); return true; }
+         return false;`,
+      ),
     );
-    await new Promise((r) => setTimeout(r, 200));
-    const after = await classicExecute<boolean>(
-      `return !!document.querySelector('[data-external-change-banner]');`,
-    );
-    expect(after).to.equal(false);
+    expect(clicked, '"Keep mine" button should render and be clicked').to.equal(true);
+    expect(await pollFor(async () => !(await bannerPresent())), 'banner should clear').to.equal(true);
   });
 });

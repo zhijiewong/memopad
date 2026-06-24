@@ -3,11 +3,11 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { getBrowser, classicExecute } from './support/driver';
+import { pollFor, sleep } from './support/helpers';
 
 async function exec<T>(fn: () => T): Promise<T> {
   return getBrowser().execute(fn);
 }
-async function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 const FIXTURE_SRC = path.resolve(__dirname, 'fixtures', 'workspace');
 
@@ -65,7 +65,15 @@ describe('replace-in-files', () => {
        i.dispatchEvent(new Event('input', { bubbles: true }));
        return undefined;`,
     );
-    await sleep(800);
+    // Poll for search results before clicking replace-toggle — debounce + IPC can
+    // outlast a fixed sleep on a slow runner.
+    const resultsReady = await pollFor(() =>
+      classicExecute<boolean>(
+        `return document.querySelectorAll('[data-testid="match-row"]').length > 0;`,
+      ),
+    );
+    expect(resultsReady, 'search results should appear before replacing').to.equal(true);
+
     await classicExecute<void>(
       `document.querySelector('[data-testid="replace-toggle"]').click(); return undefined;`,
     );
@@ -81,14 +89,28 @@ describe('replace-in-files', () => {
     await classicExecute<void>(
       `document.querySelector('[data-testid="replace-all"]').click(); return undefined;`,
     );
-    await sleep(200);
+    // Poll for confirm dialog — it renders on next React commit after replace-all click.
+    const confirmReady = await pollFor(() =>
+      classicExecute<boolean>(
+        `return !!document.querySelector('[data-testid="replace-confirm-btn"]');`,
+      ),
+    );
+    expect(confirmReady, 'confirm button should appear').to.equal(true);
     await classicExecute<void>(
       `document.querySelector('[data-testid="replace-confirm-btn"]').click(); return undefined;`,
     );
-    await sleep(2000);
+    // Poll the file on disk — the replace IPC is async and can outlast sleep(2000)
+    // on a slow CI runner.
     const notesPath = path.join(workspace, 'notes.txt');
+    const written = await pollFor(() => {
+      try {
+        return Promise.resolve(/ALPHA/.test(fs.readFileSync(notesPath, 'utf-8')));
+      } catch {
+        return Promise.resolve(false);
+      }
+    });
+    expect(written, 'notes.txt should contain ALPHA after replace').to.equal(true);
     const after = fs.readFileSync(notesPath, 'utf-8');
-    expect(after).to.match(/ALPHA/);
     expect(after).to.not.match(/alpha/);
   });
 
@@ -99,11 +121,6 @@ describe('replace-in-files', () => {
       `window.__memopadTestSetWorkspace(${JSON.stringify(workspace)}); return undefined;`,
     );
     await sleep(150);
-    // Open notes.txt as a dirty buffer via the window test hooks. We can't
-    // `import('/src/stores/buffers')` here: that dev-server path 404s in the
-    // release build the e2e suite runs against. Keep native separators so the
-    // buffer path matches the search-result paths (Rust walker → backslashes on
-    // Windows); JSON.stringify escapes them safely.
     const notesPath = path.join(workspace, 'notes.txt');
     await classicExecute<void>(
       `var id = window.__memopadTestOpenBuffer({ path: ${JSON.stringify(notesPath)}, content: 'alpha', encoding: 'utf-8', eol: 'crlf' });

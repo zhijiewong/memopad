@@ -170,20 +170,40 @@ export async function startDriverAndSession(): Promise<Browser> {
   // causes msedgedriver to negotiate BiDi; the BiDi context gets stuck at
   // about:blank instead of navigating to tauri.localhost. Using attach()
   // on a manually-created session avoids this issue entirely.
-  const sessRes = await wdRequest<{ sessionId: string; capabilities: Record<string, unknown> }>(
-    'POST',
-    '/session',
-    {
-      capabilities: {
-        alwaysMatch: {
-          browserName: 'wry',
-          'tauri:options': { application: RELEASE_BIN },
+  //
+  // Retried with backoff: on a cold CI runner tauri-driver may not be ready
+  // 2 s after spawn, and a single failed POST surfaced as the "sessionId is
+  // required to attach" startup flake (0 specs run).
+  let rawSession: { sessionId: string; capabilities: Record<string, unknown> } | undefined;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 5 && !rawSession; attempt++) {
+    try {
+      const sessRes = await wdRequest<{ sessionId: string; capabilities: Record<string, unknown> }>(
+        'POST',
+        '/session',
+        {
+          capabilities: {
+            alwaysMatch: {
+              browserName: 'wry',
+              'tauri:options': { application: RELEASE_BIN },
+            },
+          },
         },
-      },
-    },
-  );
-
-  const rawSession = sessRes.value as unknown as { sessionId: string; capabilities: Record<string, unknown> };
+      );
+      const candidate = sessRes.value as unknown as { sessionId: string; capabilities: Record<string, unknown> };
+      if (candidate && candidate.sessionId) {
+        rawSession = candidate;
+      } else {
+        lastError = new Error(`session response had no sessionId: ${JSON.stringify(sessRes).slice(0, 300)}`);
+      }
+    } catch (err) {
+      lastError = err;
+    }
+    if (!rawSession && attempt < 5) await sleep(2000);
+  }
+  if (!rawSession) {
+    throw new Error(`Could not create WebDriver session after 5 attempts: ${String(lastError)}`);
+  }
   sessionId = rawSession.sessionId;
 
   // Wrap the existing session with WebdriverIO (for deleteSession, etc.).

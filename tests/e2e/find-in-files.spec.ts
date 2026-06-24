@@ -1,11 +1,11 @@
 import { expect } from 'chai';
 import * as path from 'node:path';
 import { getBrowser, classicExecute } from './support/driver';
+import { pollFor, sleep } from './support/helpers';
 
 async function exec<T>(fn: () => T): Promise<T> {
   return getBrowser().execute(fn);
 }
-async function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'workspace');
 
@@ -110,28 +110,26 @@ describe('find-in-files', () => {
        }
        return undefined;`,
     );
-    await sleep(800);
-    await classicExecute<void>(
-      `const row = document.querySelector('[data-testid="match-row"]');
-       if (row) row.click();
-       return undefined;`,
+    // Poll until a result row exists AND the click lands: the search debounce +
+    // IPC round-trip can outlast any fixed sleep on a slow runner, and a blind
+    // `if (row) row.click()` silently no-ops — leaving no buffer open and the
+    // old title-bar fallback reading empty-state chrome (the documented flake).
+    const clicked = await pollFor(() =>
+      classicExecute<boolean>(
+        `const row = document.querySelector('[data-testid="match-row"]');
+         if (row) { row.click(); return true; }
+         return false;`,
+      ),
     );
-    await sleep(500);
-    // After clicking, the active tab path should contain "notes.txt" or "code.rs".
-    const activePath = await classicExecute<string | null>(
-      `const state = window.__memopadTestGetActiveBufferPath
-          ? window.__memopadTestGetActiveBufferPath()
-          : null;
-       return state;`,
-    );
-    // If the test hook doesn't exist, fall back to reading the title-bar text.
-    if (activePath) {
-      expect(activePath).to.match(/notes\.txt|code\.rs/);
-    } else {
-      const titleText = await classicExecute<string>(
-        `return document.querySelector('.drag-region')?.textContent || '';`,
+    expect(clicked, 'a match row should render and be clicked').to.equal(true);
+    // After clicking, the active buffer path should contain "notes.txt" or
+    // "code.rs" (openFile is async — poll for it).
+    const opened = await pollFor(async () => {
+      const p = await classicExecute<string | null>(
+        `return window.__memopadTestGetActiveBufferPath();`,
       );
-      expect(titleText).to.match(/notes\.txt|code\.rs|Untitled/);
-    }
+      return p != null && /notes\.txt|code\.rs/.test(p);
+    });
+    expect(opened, 'clicked match should open its file').to.equal(true);
   });
 });
