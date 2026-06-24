@@ -1,8 +1,7 @@
 import { expect } from 'chai';
 import * as path from 'node:path';
 import { getBrowser, classicExecute } from './support/driver';
-
-async function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+import { pollFor, sleep } from './support/helpers';
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'workspace');
 
@@ -28,20 +27,32 @@ describe('file-tree context menu', () => {
     await classicExecute<void>(
       `window.__memopadTestSetWorkspace(${JSON.stringify(FIXTURE)}); return undefined;`,
     );
-    await sleep(500);
 
-    await classicExecute<void>(
-      `const rows = document.querySelectorAll('[data-testid="tree-row"][data-is-dir="false"]');
-       for (const r of rows) {
-         if ((r.textContent || '').includes('notes.txt')) {
-           const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 100, clientY: 100 });
-           r.dispatchEvent(ev);
-           break;
+    // Poll until the tree has loaded AND the contextmenu dispatch lands: the
+    // tree rows arrive via async IPC + render, and a dispatch loop that finds
+    // no row silently no-ops (the documented 0-items CI flake).
+    const dispatched = await pollFor(() =>
+      classicExecute<boolean>(
+        `const rows = document.querySelectorAll('[data-testid="tree-row"][data-is-dir="false"]');
+         for (const r of rows) {
+           if ((r.textContent || '').includes('notes.txt')) {
+             const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 100, clientY: 100 });
+             r.dispatchEvent(ev);
+             return true;
+           }
          }
-       }
-       return undefined;`,
+         return false;`,
+      ),
     );
-    await sleep(150);
+    expect(dispatched, 'notes.txt row should render and receive contextmenu').to.equal(true);
+
+    // The menu itself renders on the next React commit — poll for all 5 items.
+    const menuReady = await pollFor(async () =>
+      (await classicExecute<number>(
+        `return document.querySelectorAll('[role="menuitem"]').length;`,
+      )) === 5,
+    );
+    expect(menuReady, 'context menu should show 5 items').to.equal(true);
 
     const items = await classicExecute<string[]>(
       `return Array.from(document.querySelectorAll('[role="menuitem"]')).map(b => b.textContent || '');`,
