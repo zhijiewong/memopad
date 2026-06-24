@@ -1,11 +1,11 @@
 import { expect } from 'chai';
 import * as path from 'node:path';
 import { getBrowser, classicExecute } from './support/driver';
+import { pollFor, sleep } from './support/helpers';
 
 async function exec<T>(fn: () => T): Promise<T> {
   return getBrowser().execute(fn);
 }
-async function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'workspace');
 
@@ -31,11 +31,12 @@ describe('file-tree', () => {
     await classicExecute<void>(
       `window.__memopadTestSetWorkspace(${JSON.stringify(FIXTURE)}); return undefined;`,
     );
-    await sleep(800);
-    const rowCount = await classicExecute<number>(
-      `return document.querySelectorAll('[data-testid="tree-row"]').length;`,
+    const rowCount = await pollFor(async () =>
+      (await classicExecute<number>(
+        `return document.querySelectorAll('[data-testid="tree-row"]').length;`,
+      )) >= 2,
     );
-    expect(rowCount).to.be.greaterThanOrEqual(2);
+    expect(rowCount, 'workspace root should have at least 2 rows').to.equal(true);
   });
 
   it('clicking a folder expands it and loads children', async () => {
@@ -44,19 +45,24 @@ describe('file-tree', () => {
     await classicExecute<void>(
       `window.__memopadTestSetWorkspace(${JSON.stringify(FIXTURE)}); return undefined;`,
     );
-    await sleep(800);
-    await classicExecute<void>(
-      `const rows = document.querySelectorAll('[data-testid="tree-row"][data-is-dir="true"]');
-       for (const r of rows) {
-         if (r.textContent && r.textContent.indexOf('sub') !== -1) { r.click(); break; }
-       }
-       return undefined;`,
+    // Poll until the 'sub' folder row exists AND the click lands.
+    const clicked = await pollFor(() =>
+      classicExecute<boolean>(
+        `const rows = document.querySelectorAll('[data-testid="tree-row"][data-is-dir="true"]');
+         for (const r of rows) {
+           if (r.textContent && r.textContent.indexOf('sub') !== -1) { r.click(); return true; }
+         }
+         return false;`,
+      ),
     );
-    await sleep(600);
-    const childCount = await classicExecute<number>(
-      `return document.querySelectorAll('[data-testid="tree-row"][data-depth="1"]').length;`,
+    expect(clicked, 'sub folder row should render and be clicked').to.equal(true);
+    // Poll until child rows at depth-1 appear.
+    const hasChildren = await pollFor(async () =>
+      (await classicExecute<number>(
+        `return document.querySelectorAll('[data-testid="tree-row"][data-depth="1"]').length;`,
+      )) >= 1,
     );
-    expect(childCount).to.be.greaterThanOrEqual(1);
+    expect(hasChildren, 'sub folder should have at least one child row').to.equal(true);
   });
 
   it('clicking a file opens it as the active tab', async () => {
@@ -65,20 +71,26 @@ describe('file-tree', () => {
     await classicExecute<void>(
       `window.__memopadTestSetWorkspace(${JSON.stringify(FIXTURE)}); return undefined;`,
     );
-    await sleep(800);
-    await classicExecute<void>(
-      `const rows = document.querySelectorAll('[data-testid="tree-row"][data-is-dir="false"]');
-       for (const r of rows) {
-         if (r.textContent && r.textContent.indexOf('notes.txt') !== -1) { r.click(); break; }
-       }
-       return undefined;`,
+    // Poll until notes.txt row exists AND the click lands.
+    const clicked = await pollFor(() =>
+      classicExecute<boolean>(
+        `const rows = document.querySelectorAll('[data-testid="tree-row"][data-is-dir="false"]');
+         for (const r of rows) {
+           if (r.textContent && r.textContent.indexOf('notes.txt') !== -1) { r.click(); return true; }
+         }
+         return false;`,
+      ),
     );
-    await sleep(500);
-    const activePath = await classicExecute<string | null>(
-      `if (window.__memopadTestGetActiveBufferPath) return window.__memopadTestGetActiveBufferPath();
-       const titleEl = document.querySelector('.drag-region');
-       return titleEl ? titleEl.textContent : null;`,
-    );
-    expect(activePath ?? '').to.match(/notes\.txt/);
+    expect(clicked, 'notes.txt row should render and be clicked').to.equal(true);
+    // Poll until the active buffer path reflects notes.txt.
+    const opened = await pollFor(async () => {
+      const p = await classicExecute<string | null>(
+        `if (window.__memopadTestGetActiveBufferPath) return window.__memopadTestGetActiveBufferPath();
+         const titleEl = document.querySelector('.drag-region');
+         return titleEl ? titleEl.textContent : null;`,
+      );
+      return p != null && /notes\.txt/.test(p);
+    });
+    expect(opened, 'notes.txt should become the active buffer').to.equal(true);
   });
 });

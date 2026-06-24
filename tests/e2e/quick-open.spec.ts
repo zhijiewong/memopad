@@ -1,8 +1,7 @@
 import { expect } from 'chai';
 import * as path from 'node:path';
 import { getBrowser, classicExecute } from './support/driver';
-
-async function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+import { pollFor, sleep } from './support/helpers';
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'workspace');
 
@@ -26,14 +25,13 @@ describe('quick open', () => {
     await sleep(150);
 
     await getBrowser().keys(['Control', 'p']);
-    await sleep(300);
-
-    const paletteVisible = await classicExecute<boolean>(
-      `return !!document.querySelector('[data-testid="quick-open-palette"]');`,
+    // Poll for palette instead of fixed sleep — palette renders on next React commit.
+    const paletteVisible = await pollFor(() =>
+      classicExecute<boolean>(
+        `return !!document.querySelector('[data-testid="quick-open-palette"]');`,
+      ),
     );
     expect(paletteVisible).to.equal(true);
-
-    await sleep(500);
 
     await classicExecute<void>(
       `const i = document.querySelector('[data-testid="quick-open-input"]');
@@ -42,20 +40,22 @@ describe('quick open', () => {
        i.dispatchEvent(new Event('input', { bubbles: true }));
        return undefined;`,
     );
-    await sleep(300);
-
-    const rowCount = await classicExecute<number>(
-      `return document.querySelectorAll('[data-testid="quick-open-row"]').length;`,
+    // Poll until filtered rows appear — debounce + index lookup can outlast fixed sleep.
+    const rowsReady = await pollFor(async () =>
+      (await classicExecute<number>(
+        `return document.querySelectorAll('[data-testid="quick-open-row"]').length;`,
+      )) >= 1,
     );
-    expect(rowCount).to.be.greaterThanOrEqual(1);
+    expect(rowsReady, 'quick-open should show at least one result row').to.equal(true);
 
     await getBrowser().keys(['Enter']);
-    await sleep(400);
-
-    const stillOpen = await classicExecute<boolean>(
-      `return !!document.querySelector('[data-testid="quick-open-palette"]');`,
+    // Poll for palette to close.
+    const closed = await pollFor(async () =>
+      !(await classicExecute<boolean>(
+        `return !!document.querySelector('[data-testid="quick-open-palette"]');`,
+      )),
     );
-    expect(stillOpen).to.equal(false);
+    expect(closed, 'palette should close after Enter').to.equal(true);
 
     const activePath = await classicExecute<string | null>(
       `if (window.__memopadTestGetActiveBufferPath) return window.__memopadTestGetActiveBufferPath();
